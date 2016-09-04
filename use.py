@@ -1,8 +1,6 @@
-from pryo import KBMan, NotEq, scm, var, Assert, Func, Eq, TermCnpd
-from pprint import pprint
+import pryo as po
 
-
-k = KBMan()
+k = po.KBMan()
 q = k.query
 
 k.father('opa', 'pap')
@@ -11,36 +9,54 @@ k.mother('mum', 'a')
 k.father('pap', 'b')
 k.mother('mum', 'b')
 
-x, y, z, w = scm(4)
+# Schematic variables for First-Order rules
+x, y, z, w = po.scm(4)
 
+# Definite clause
 k.sibling(x, y) <= (
     k.father(z, x) &
     k.father(z, y) &
-    NotEq(x, y)
+    po.NotEq(x, y)
 )
 
+# Alternative clauses
+k.parent(x, y) <= k.father(x, y)
+k.parent(x, y) <= k.mother(x, y)
+
+# Recursive rules
 k.ancester(x, y) <= k.father(x, y)
 k.ancester(x, y) <= k.father(x, z) & k.ancester(z, y)
 
-print(k._kb)
+v = po.var
 
-r = q.sibling(var.x, var.y)
+r = q.sibling(v.m, v.n)
 print(list(r))
 
-r = q.ancester(var.x, var.y)
+r = q.parent(v.p, 'b')
 print(list(r))
+
+r = q.ancester(v.x, 'b')
+print(list(r))
+
+from pprint import pprint
 
 import operator as op
-k.factorial(0, 1)
+from operator import ge, sub, mul
+
+AF = po.AssertFunc
+F = po.Func
+
+k.factorial(0, 1)                      # fatorial(0) == 1
 k.factorial(x, y) <= (
-    Assert(Func(op.ge, x, 0)) &
-    k.factorial(Func(op.sub, x, 1), z) &
-    Eq(y, Func(op.mul, x, z))
+    AF(ge, x, 0) &                     # x > 0
+    k.factorial(F(sub, x, 1), z) &     # z == factorial(x - 1)
+    po.Eq(y, F(mul, x, z))             # y == x * z
 )
 
-r = q.factorial(4, var.w)
-# r = q.factorial(4)
+r = q.factorial(4, v.w)
 print(list(r))
+# r = q.factorial(4)
+assert 0
 
 # FIXME: what is indeed Relation? Term? Predicate?
 # CONFER: datomic 5-tuple

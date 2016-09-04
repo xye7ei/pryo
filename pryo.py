@@ -152,6 +152,9 @@ class Func(Term):
 def Assert(func):
     return Eq(True, func)
 
+def AssertFunc(op, *terms):
+    return Eq(True, Func(op, *terms))
+
 # === Easy Use ===
 def easy(cls):
     class _E(object):
