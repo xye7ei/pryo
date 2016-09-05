@@ -113,6 +113,39 @@ class Var(Term):
     def __eq__(self, other):
         return type(other) == type(self) and self.symbol == other.symbol
 
+class Func(Term):
+    "Func is a lazy object for function application."
+    def __init__(self, op, *args):
+        self.op = op
+        self.args = args
+    def __iter__(self):
+        yield self.op
+        yield self.args
+    def __repr__(self):
+        op_name = self.op.__name__
+        return '{}{}'.format(op_name, self.args or '')
+        # return '{}{}'.format(self.op, self.args or '')
+    def __call__(self, *args):
+        self.args = args
+        return self
+    def __hash__(self):
+        return hash(self.op)
+    def eval(self):
+        return self.op(*self.args)
+    def can_eval(self):
+        return all(type(a) not in (Var, Func) for a in self.args)
+ap = Func
+
+def Assert(func):
+    return Eq(True, func)
+
+def AssertFunc(op, *terms):
+    return Eq(True, Func(op, *terms))
+
+asp = AssertFunc
+
+import operator as op
+
 class ScmVar(Term):
     """Schematic/Template Variable is a special term only used during
     defining rules.
@@ -125,44 +158,33 @@ class ScmVar(Term):
         self.mark = mark
     def __repr__(self):
         return '?{}'.format(self.mark)
-    def __eq__(self, other):
-        return type(self) == type(other) and self.mark == other.mark
-    def __hash__(self):
-        return hash(self.mark)
 
-class Func(Term):
-    "Func is a lazy object for function application."
-    def __init__(self, op, *args):
-        self.op = op
-        self.args = args
-    def __iter__(self):
-        yield self.op
-        yield self.args
-    def __repr__(self):
-        # op_name = self.op.__name__
-        # return '{}{}'.format(op_name, self.args or '')
-        return '{}{}'.format(self.op, self.args or '')
-    def __hash__(self):
-        return hash(self.op)
-    def eval(self):
-        return self.op(*self.args)
-    def can_eval(self):
-        return all(type(a) not in (Var, Func) for a in self.args)
+    def __eq__(self, other): return Eq(self, other)
+    def __ne__(self, other): return NotEq(self, other)
+    def __gt__(self, other): return AssertFunc(op.gt, self, other)
+    def __ge__(self, other): return AssertFunc(op.ge, self, other)
 
-def Assert(func):
-    return Eq(True, func)
+    def __add__(self, other): return ap(op.add, self, other)
+    def __sub__(self, other): return ap(op.sub, self, other)
+    def __mul__(self, other): return ap(op.mul, self, other)
+    def __rmul__(self, other): return ap(op.mul, self, other)
+    def __mod__(self, other): return ap(op.mod, self, other)
+    def __pow__(self, other): return ap(op.pow, self, other)
+    def __pos__(self, other): return ap(op.pos, self, other)
+    def __neg__(self, other): return ap(op.neg, self, other)
+    def __matmul__(self, other): return ap(op.matmul, self, other)
+    def __truediv__(self, other): return ap(op.truediv, self, other)
+    def __rtruediv__(self, other): return ap(op.truediv, other, self)
 
-def AssertFunc(op, *terms):
-    return Eq(True, Func(op, *terms))
 
 # === Easy Use ===
 def easy(cls):
     class _E(object):
         def __getattr__(self, k):
             return cls(k)
-        def __call__(self, n):
-            for i in range(n):
-                yield cls(str(i))
+        def __call__(self, words):
+            for w in words:
+                yield cls(w)
     cls.new = _E()
     # return cls
     return cls.new
@@ -323,9 +345,9 @@ def univ_inst(x, u=None):
     "Instantiate ScmVar to Var."
     if u is None: u = {}
     if isinstance(x, ScmVar):
-        if x not in u:
-            u[x] = Var('{}_#{}'.format(x.mark, next(stand_count)))
-        return u[x]
+        if x.mark not in u:
+            u[x.mark] = Var('{}_#{}'.format(x.mark, next(stand_count)))
+        return u[x.mark]
     elif isinstance(x, Var):
         raise
     elif isinstance(x, TermCnpd):
@@ -479,7 +501,9 @@ class KB(object):
     # Ask for simple Predicate.
     def ask_fact(kb, goal, u):
         for fact in kb.get_facts(goal.key):
-            u1 = unify(fact, goal, u)
+            fact1 = univ_inst(fact)
+            u1 = unify(fact1, goal, u)
+            # u1 = unify(fact, goal, u)
             if u1 is not FAIL:
                 yield u1
 
@@ -505,15 +529,38 @@ class PredM(Pred):
     def __init__(self, verb, kb=None):
         self.verb = verb
         self.kb = kb
-    def __le__(self, other):
-        r = super(PredM, self).__le__(other)
-        self.kb.tell(r)
-    def __call__(self, *terms):
-        # super(PredM, self).__call__(*terms) # set attribute `terms`
+
+    # def __call__(self, *terms):
+    #     # super(PredM, self).__call__(*terms) # set attribute `terms`
+    #     self.terms = terms
+    #     if all(not isinstance(t, ScmVar) for t in terms):
+    #         self.kb.tell(self)
+    #     return self
+
+    def __le__(self, rhs):
+        lhs = Pred(self.verb, *self.terms)
+        if isinstance(rhs, (list, tuple)):
+            assert len(rhs) > 0
+            sub = rhs[0]
+            for sub1 in rhs[1:]:
+                sub = And(sub, sub1)
+            self.kb.tell(Rule(lhs, sub))
+        elif isinstance(rhs, Sen):
+            self.kb.tell(Rule(lhs, rhs))
+
+    def __getitem__(self, terms):
+        if type(terms) != tuple:
+            terms = (terms,)
         self.terms = terms
-        if all(not isinstance(t, ScmVar) for t in terms):
-            self.kb.tell(self)
         return self
+
+    def __setitem__(self, terms, rhs):
+        lhs = self[terms]
+        self.kb.tell(Rule(lhs, rhs))
+
+    def __pos__(self):
+        "For tell schematic facts?"
+        self.kb.tell(Pred(self.verb, *self.terms))
 
 
 class KBMan(object):

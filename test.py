@@ -22,6 +22,8 @@ if __name__ == '__main__':
             NotEq(ScmVar('x'), ScmVar('y'))
     )
 
+    print(kb)
+
     # kb.father('pap', 'a')
     # kb.mother('mum', 'a')
     # kb.sibling(1, 2) <= kb.father(3, 1) & kb.father(3, 2) & (1 != 2)

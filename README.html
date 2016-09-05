@@ -1023,39 +1023,40 @@ body .markdown-body
 
 k = po.KBMan()
 
-# Facts with literals
-k.father('opa', 'pap')
-k.father('pap', 'a')
-k.mother('mum', 'a')
-k.father('pap', 'b')
-k.mother('mum', 'b')
+# Add facts
++k.father['opa', 'pap']
++k.father['pap', 'a']
++k.mother['mum', 'a']
++k.father['pap', 'b']
++k.mother['mum', 'b']
 
-# Schematic variables for constructing First-Order rules
-x, y, z, w = po.scm(4)
+# Schematic variables for First-Order rules
+x, y, z, w = po.scm('xyzw')
 
 # Definite clause
-k.sibling(x, y) &lt;= (
-    k.father(z, x) &amp;
-    k.father(z, y) &amp;
-    po.NotEq(x, y)
+k.sibling[x, y] &lt;= (
+    k.father[z, x] &amp;
+    k.father[z, y] &amp;
+    (x != y)
 )
 
-# Alternative premises
-k.parent(x, y) &lt;= k.father(x, y)
-k.parent(x, y) &lt;= k.mother(x, y)
+# Alternative clauses
+k.parent[x, y] &lt;= k.father[x, y]
+k.parent[x, y] &lt;= k.mother[x, y]
 
 # Recursive rules
-k.ancester(x, y) &lt;= k.father(x, y)
-k.ancester(x, y) &lt;= k.father(x, z) &amp; k.ancester(z, y)
+k.ancester[x, y] &lt;= k.father[x, y]
+k.ancester[x, y] &lt;= k.father[x, z] &amp; k.ancester[z, y]
 </code></pre>
 
 <p>Given facts/rules, queries can be fired by calling attributes from <code>query</code> attribute of <code>KBMan</code>:</p>
-<pre><code class="python">v = po.var
+<pre><code class="python"># Instant variable for queries
+v = po.var
 q = k.query
 
 r = q.sibling(v.m, v.n)
 print(list(r))
-# [{$n: 'b', $m: 'a'}, {$n: 'a', $m: 'b'}]
+# [{$m: 'a', $n: 'b'}, {$m: 'b', $n: 'a'}]
 
 r = q.parent(v.p, 'b')
 print(list(r))
@@ -1064,22 +1065,20 @@ print(list(r))
 r = q.ancester(v.x, 'b')
 print(list(r))
 # [{$x: 'pap'}, {$x: 'opa'}]
-
 </code></pre>
 
 <p>Rules simulating <em>pattern matching</em> functions are supported:</p>
-<pre><code class="python">from operator import ge, sub, mul
+<pre><code class="python"># Boundary case as fact to add
++k.factorial[0, 1]              # fatorial[0] == 1
 
-AF = po.AssertFunc
-F = po.Func
-
-k.factorial(0, 1)                      # fatorial(0) == 1
-k.factorial(x, y) &lt;= (
-    AF(ge, x, 0) &amp;                     # x &gt; 0
-    k.factorial(F(sub, x, 1), z) &amp;     # z == factorial(x - 1)
-    po.Eq(y, F(mul, x, z))             # y == x * z
+# Recurive rule
+k.factorial[x, y] &lt;= (
+    (x &gt;= 0) &amp;                  # x &gt;= 0
+    k.factorial[x - 1, z] &amp;     # z == factorial[x - 1]
+    (y == x * z)                # y == x * z
 )
 
+# Query results
 r = q.factorial(4, v.w)
 print(list(r))
 # [{$w: 24}]
@@ -1094,7 +1093,7 @@ print(list(r))
 <p>though more tricks for simplification are yet to be explored.</p>
 <h3 id="todo"><a name="user-content-todo" href="#todo" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>TODO</h3>
 <ul>
-<li>Clearance of adding predicates not in <em>Definite Clause</em> form like <code>k.append(NIL, Y, Y)</code>, which is indeed <code>k.append(NIL, Y, Z) &lt;= Eq(Y, Z)</code> in DC form.</li>
 <li>Confering ideas from project <a href="http://www.datomic.com/">datomic</a> - a <em>Datalog</em> system in <em>Clojure</em></li>
 <li>Figuring out relations between data <em>Record</em> and <em>Relations</em></li>
+<li>Ordering of query subexpressions?</li>
 </ul></article></body></html>
