@@ -19,7 +19,7 @@ k.father < ('opa', 'pap')
 k.father < ('pap', 'a')
 k.father < ('pap', 'b')
 
-# Alterative way pushing a list
+# Alterative way pushing a list of facts
 k.mother << [
     ('mum', 'a'),
     ('mum', 'b')
@@ -77,7 +77,7 @@ k.factorial < (0, 1)            # fatorial[0] == 1
 
 # Recurive rule
 k.factorial(x, y) <= (
-    x > 0,                     # x >= 0
+    x > 0,                      # x > 0
     k.factorial(x - 1, z),      # z == factorial(x - 1)
     y == x * z                  # y == x * z
 )
@@ -103,11 +103,11 @@ k.append(Cons(x, xs), y, Cons(x, zs)) <= k.append(xs, y, zs)
 
 r = q.append(NIL, Cons(3, NIL), v.z)
 print(list(r))
-[{$z: Cons(3, None)}]
+# [{$z: Cons(3, None)}]
 
 r = q.append(Cons(1, NIL), Cons(3, NIL), v.z)
 print(list(r))
-[{$z: Cons(1, Cons(3, None))}]
+# [{$z: Cons(1, Cons(3, None))}]
 ```
 
 
