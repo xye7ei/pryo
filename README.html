@@ -1014,44 +1014,52 @@ body .markdown-body
     page-break-after: avoid;
   }
 }
-</style><title>README</title></head><body><article class="markdown-body"><h1 id="pyro"><a name="user-content-pyro" href="#pyro" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>pyro</h1>
+</style><title>README</title></head><body><article class="markdown-body"><h1 id="pryo"><a name="user-content-pryo" href="#pryo" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>pryo</h1>
 <p>This is a experimental core implementation for native <em>Prolog</em> functionalities in <em>Python</em> environment. It aims to allow experimenting Prolog-style knowledge-base within Python without any dependencies.</p>
 <p>The implementation is based on instructions in book <a href="http://aima.cs.berkeley.edu/">AIMA</a> with simplest <em>backward-chaining</em> algorithm for querying. <code>dict</code> (hash table) is used for naive indexing.</p>
 <h3 id="first-view"><a name="user-content-first-view" href="#first-view" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>First View</h3>
-<p>The knowledge base can be simply declared as the following. <code>KBMan</code> - the knowledge base manager is the namespace and basic object. The <em>facts</em> are simply declared by <em>calling</em> attributes and <em>rules</em> (<em>definite clauses</em>) declared by <code>&lt;=</code> notations:</p>
-<pre><code class="python">import pryo as po
+<p>The knowledge base can be simply declared as the following. <code>KBMan</code> - the knowledge base manager is the namespace and basic object. The <em>facts</em> are simply declared by pushing n-ary tuple with <code>&lt;</code> into a fact symbol and <em>rules</em> (<em>definite clauses</em>) declared by <code>&lt;=</code> notations:</p>
+<pre><code class="python">import pryo as pr
 
-k = po.KBMan()
+k = pr.KBMan()
 
 # Add facts
-+k.father['opa', 'pap']
-+k.father['pap', 'a']
-+k.mother['mum', 'a']
-+k.father['pap', 'b']
-+k.mother['mum', 'b']
+k.father &lt; ('opa', 'pap')
+k.father &lt; ('pap', 'a')
+k.father &lt; ('pap', 'b')
+
+# Alterative way pushing a list
+k.mother &lt;&lt; [
+    ('mum', 'a'),
+    ('mum', 'b')
+]
 
 # Schematic variables for First-Order rules
-x, y, z, w = po.scm('xyzw')
+x, y, z, w = pr.scm('xyzw')
 
 # Definite clause
-k.sibling[x, y] &lt;= (
-    k.father[z, x] &amp;
-    k.father[z, y] &amp;
-    (x != y)
+k.sibling(x, y) &lt;= (
+    k.father(z, x),
+    k.father(z, y),
+    x != y,
 )
 
 # Alternative clauses
-k.parent[x, y] &lt;= k.father[x, y]
-k.parent[x, y] &lt;= k.mother[x, y]
+k.parent(x, y) &lt;= k.father(x, y)
+k.parent(x, y) &lt;= k.mother(x, y)
 
 # Recursive rules
-k.ancester[x, y] &lt;= k.father[x, y]
-k.ancester[x, y] &lt;= k.father[x, z] &amp; k.ancester[z, y]
+k.ancester(x, y) &lt;= k.father(x, y)
+k.ancester(x, y) &lt;= (
+    k.father(x, z),
+    k.ancester(z, y)
+)
+
 </code></pre>
 
-<p>Given facts/rules, queries can be fired by calling attributes from <code>query</code> attribute of <code>KBMan</code>:</p>
+<p>Given facts and rules, queries can be fired by calling attributes from <code>query</code> attribute of <code>KBMan</code>:</p>
 <pre><code class="python"># Instant variable for queries
-v = po.var
+v = pr.var
 q = k.query
 
 r = q.sibling(v.m, v.n)
@@ -1065,17 +1073,18 @@ print(list(r))
 r = q.ancester(v.x, 'b')
 print(list(r))
 # [{$x: 'pap'}, {$x: 'opa'}]
+
 </code></pre>
 
 <p>Rules simulating <em>pattern matching</em> functions are supported:</p>
 <pre><code class="python"># Boundary case as fact to add
-+k.factorial[0, 1]              # fatorial[0] == 1
+k.factorial &lt; (0, 1)            # fatorial[0] == 1
 
 # Recurive rule
-k.factorial[x, y] &lt;= (
-    (x &gt;= 0) &amp;                  # x &gt;= 0
-    k.factorial[x - 1, z] &amp;     # z == factorial[x - 1]
-    (y == x * z)                # y == x * z
+k.factorial(x, y) &lt;= (
+    x &gt; 0,                     # x &gt;= 0
+    k.factorial(x - 1, z),      # z == factorial(x - 1)
+    y == x * z                  # y == x * z
 )
 
 # Query results
@@ -1084,10 +1093,29 @@ print(list(r))
 # [{$w: 24}]
 </code></pre>
 
+<p>Some user-defined or pre-defined structures are also no problem, for example the <code>Cons</code> structure and the <code>append</code> predicate over such structure:<br />
+<pre><code class="python"># Declare literal data type
+Cons = lambda car, cdr: TermCnpd('Cons', car, cdr)
+NIL = None
+
+# Declare predicate
+xs, ys, zs = scm('xs ys zs'.split())
+
+k.append &lt; (NIL, y, y)
+
+k.append(Cons(x, xs), y, Cons(x, zs)) &lt;= k.append(xs, y, zs)
+
+r = q.append(NIL, Cons(3, NIL), v.z)
+print(list(r))
+[{$z: Cons(3, None)}]
+
+r = q.append(Cons(1, NIL), Cons(3, NIL), v.z)
+print(list(r))
+[{$z: Cons(1, Cons(3, None))}]
+</code></pre></p>
 <p>In summary, several features are interesting here:</p>
 <ul>
-<li>Non-literal specification of predicates/terms. For example</li>
-<li>Querying with <code>And</code> (conjunctive) predicates;</li>
+<li>Non-literal specification of predicates/terms.</li>
 <li>Function application object <code>Func</code>;</li>
 </ul>
 <p>though more tricks for simplification are yet to be explored.</p>

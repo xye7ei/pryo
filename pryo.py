@@ -142,6 +142,15 @@ def Assert(func):
 def AssertFunc(op, *terms):
     return Eq(True, Func(op, *terms))
 
+def Gt(l, r):
+    return Eq(True, Func(op.gt, l, r))
+def Lt(l, r):
+    return Eq(True, Func(op.lt, l, r))
+def Ge(l, r):
+    return Eq(True, Func(op.ge, l, r))
+def Le(l, r):
+    return Eq(True, Func(op.le, l, r))
+
 asp = AssertFunc
 
 import operator as op
@@ -155,9 +164,13 @@ class ScmVar(Term):
 
     """
     def __init__(self, mark):
-        self.mark = mark
+        assert isinstance(mark, str) and mark
+        self._mark = mark
     def __repr__(self):
-        return '?{}'.format(self.mark)
+        return ':{}'.format(self._mark)
+
+    # def __getattr__(self, k):
+    #     if not k.startswith('_'): return ap(getattr,)
 
     def __eq__(self, other): return Eq(self, other)
     def __ne__(self, other): return NotEq(self, other)
@@ -175,7 +188,6 @@ class ScmVar(Term):
     def __matmul__(self, other): return ap(op.matmul, self, other)
     def __truediv__(self, other): return ap(op.truediv, self, other)
     def __rtruediv__(self, other): return ap(op.truediv, other, self)
-
 
 # === Easy Use ===
 def easy(cls):
@@ -345,9 +357,9 @@ def univ_inst(x, u=None):
     "Instantiate ScmVar to Var."
     if u is None: u = {}
     if isinstance(x, ScmVar):
-        if x.mark not in u:
-            u[x.mark] = Var('{}_#{}'.format(x.mark, next(stand_count)))
-        return u[x.mark]
+        if x._mark not in u:
+            u[x._mark] = Var('{}_#{}'.format(x._mark, next(stand_count)))
+        return u[x._mark]
     elif isinstance(x, Var):
         raise
     elif isinstance(x, TermCnpd):
@@ -523,6 +535,7 @@ class KB(object):
 
 # === Front-end ===
 # - Supply tricky sugar for using KB functionalities neatly.
+from functools import reduce
 
 class PredM(Pred):
     "Subtyping `Pred` to support adding instance into KB when called."
@@ -530,12 +543,18 @@ class PredM(Pred):
         self.verb = verb
         self.kb = kb
 
-    # def __call__(self, *terms):
-    #     # super(PredM, self).__call__(*terms) # set attribute `terms`
-    #     self.terms = terms
-    #     if all(not isinstance(t, ScmVar) for t in terms):
-    #         self.kb.tell(self)
-    #     return self
+    def __call__(self, *terms):
+        self.terms = terms
+        return self
+
+    def __lt__(self, terms):
+        assert isinstance(terms, tuple)
+        self.kb.tell(Pred(self.verb, *terms))
+
+    def __lshift__(self, tlist):
+        assert isinstance(tlist, list)
+        for terms in tlist:
+            self.kb.tell(Pred(self.verb, *terms))
 
     def __le__(self, rhs):
         lhs = Pred(self.verb, *self.terms)
@@ -548,15 +567,15 @@ class PredM(Pred):
         elif isinstance(rhs, Sen):
             self.kb.tell(Rule(lhs, rhs))
 
-    def __getitem__(self, terms):
-        if type(terms) != tuple:
-            terms = (terms,)
-        self.terms = terms
-        return self
+    # def __getitem__(self, terms):
+    #     if type(terms) != tuple:
+    #         terms = (terms,)
+    #     self.terms = terms
+    #     return self
 
-    def __setitem__(self, terms, rhs):
-        lhs = self[terms]
-        self.kb.tell(Rule(lhs, rhs))
+    # def __setitem__(self, terms, rhs):
+    #     lhs = self[terms]
+    #     self.kb.tell(Rule(lhs, rhs))
 
     def __pos__(self):
         "For tell schematic facts?"
