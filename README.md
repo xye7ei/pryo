@@ -73,7 +73,7 @@ Rules simulating *pattern matching* functions are supported:
 
 ``` python
 # Boundary case as fact to add
-k.factorial < (0, 1)            # fatorial[0] == 1
+k.factorial < (0, 1)            # fatorial(0) == 1
 
 # Recurive rule
 k.factorial(x, y) <= (
