@@ -12,129 +12,198 @@
 # UserPred : IDENTIFIER
 
 # Subgrammar for Term
-# 
+#
 # Term     : TermFunc | TermCnpd | Const | Var | ScmVar
 # TermFunc : FUNC FUNCOP Term*
 # TermCnpd : DATA CONSTR Term* | List
-# List     : NIL | CONS Term List 
+# List     : NIL | CONS Term List
 # Const    : NUMBER | STRING | BOOLEAN
 # Var      : VARSYMBOL
 # ScmVar   : SCMSYMBOL
 
+from pprint import pformat
+
+
 # === FOL-Structures ===
 
 class Sen(object):
+
     def __init__(self, *subs):
         self.subs = subs
+
     def __and__(self, other):
         return And(self, other)
+
     def __or__(self, other):
         return Or(self, other)
+
     def __not__(self):
         return Not(self)
+
     def __le__(self, other):
         return Rule(self, other)
+
     def __repr__(self):
         return '{}{}'.format(self.__class__.__name__, self.subs)
 
+
 class And(Sen):
+
     def __repr__(self):
         return '{} & {}'.format(*self.subs)
-class Or(Sen): pass
-class Not(Sen): pass
+
+
+class Or(Sen):
+    pass
+
+
+class Not(Sen):
+    pass
+
+
 class Rule(Sen):
+
     def __repr__(self):
         return '{{{} <= {}}}'.format(self.lhs, self.rhs)
+
     @property
     def lhs(self): return self.subs[0]
+
     @property
     def rhs(self): return self.subs[1]
+
     @property
     def key(self):
         return self.lhs.verb
 
-class SenAtom(Sen): pass
+
+class SenAtom(Sen):
+    pass
+
+
 class Pred(SenAtom):
+
     """A predicate is upon 0 or more terms.
 
     A term can be a constant, Variable or Schematic Variable when
     defining rule.
 
     """
+
     def __init__(self, verb, *terms):
         assert type(verb) is str
         self.verb = verb
         self.terms = terms
+
     def __repr__(self):
         return '{}/{}{}'.format(self.verb, self.arity, list(self.terms) or '')
+
     def __call__(self, *terms):
         self.terms = terms
         return self
+
     @property
     def arity(self):
         return len(self.terms)
+
     @property
     def key(self):
         return self.verb
 
+
 class Eq(SenAtom):
+
     "Eq is a special Atomic Sentence on 2 terms."
+
     def __repr__(self):
         t1, t2 = self.subs
         return '({} == {})'.format(t1, t2)
+
+
 class NotEq(SenAtom):
+
     "NotEq is a special Atomic Sentence on 2 terms."
+
     def __repr__(self):
         t1, t2 = self.subs
         return '({} != {})'.format(t1, t2)
 
 
 class Term(object):
+
     "Abstract class."
+
     def __init__(self, *a, **kw):
-        raise NotImplementedError('Need override constructor in derived subclasses.')
+        raise NotImplementedError(
+            'Need override constructor in subclasses.')
+
 
 class TermCnpd(Term):
+
+    'Compound Term.'
+
     def __init__(self, con, *terms):
         self.con = con
         self.terms = terms
+
     def __repr__(self):
         return '{}{}'.format(self.con, self.terms)
+
     def __call__(self, *terms):
         self.terms = terms
 
+
 class Var(Term):
+
+    "Variable Term."
+
     def __init__(self, symbol):
         self.symbol = symbol
+
     def __repr__(self):
         return '${}'.format(self.symbol)
+
     def __hash__(self):
         return hash(self.symbol)
+
     def __eq__(self, other):
         return type(other) == type(self) and self.symbol == other.symbol
 
+
 class Func(Term):
-    "Func is a lazy object for function application."
+
+    "Function Term is *evaluable* term."
+
     def __init__(self, op, *args):
         self.op = op
         self.args = args
+
     def __iter__(self):
         yield self.op
         yield self.args
+
     def __repr__(self):
         op_name = self.op.__name__
         return '{}{}'.format(op_name, self.args or '')
         # return '{}{}'.format(self.op, self.args or '')
+
     def __call__(self, *args):
         self.args = args
         return self
+
     def __hash__(self):
         return hash(self.op)
+
     def eval(self):
         return self.op(*self.args)
+
     def can_eval(self):
+        """Test if each argument term already has value."""
         return all(type(a) not in (Var, Func) for a in self.args)
+
+
 ap = Func
+
 
 def Assert(func):
     return Eq(True, func)
@@ -142,12 +211,16 @@ def Assert(func):
 def AssertFunc(op, *terms):
     return Eq(True, Func(op, *terms))
 
+
 def Gt(l, r):
     return Eq(True, Func(op.gt, l, r))
+
 def Lt(l, r):
     return Eq(True, Func(op.lt, l, r))
+
 def Ge(l, r):
     return Eq(True, Func(op.ge, l, r))
+
 def Le(l, r):
     return Eq(True, Func(op.le, l, r))
 
@@ -155,17 +228,21 @@ asp = AssertFunc
 
 import operator as op
 
+
 class ScmVar(Term):
+
     """Schematic/Template Variable is a special term only used during
     defining rules.
 
-    One such variable is instantiated to Variable by Universal
-    Instantiation (standardize-apart) during ask/query.
+    A ScmVar is instantiated to Var Term by *universal instantiation*
+    (standardize-apart) during ask/query.
 
     """
+
     def __init__(self, mark):
         assert isinstance(mark, str) and mark
         self._mark = mark
+
     def __repr__(self):
         return ':{}'.format(self._mark)
 
@@ -189,6 +266,7 @@ class ScmVar(Term):
     def __truediv__(self, other): return ap(op.truediv, self, other)
     def __rtruediv__(self, other): return ap(op.truediv, other, self)
 
+
 # === Easy Use ===
 def easy(cls):
     class _E(object):
@@ -200,7 +278,7 @@ def easy(cls):
     cls.new = _E()
     # return cls
     return cls.new
-            
+
 var = easy(Var)
 scm = easy(ScmVar)
 pred = easy(Pred)
@@ -210,13 +288,16 @@ pred = easy(Pred)
 
 FAIL = '-FAIL-'
 
+
 def unify(x, y, u={}):
+
     "Unification can apply to `Term` as well as `Pred`."
+
     if u is FAIL:
         return FAIL
 
     # unify Term (9-cases in total)
-    # - Constant Term: c=c
+    # - Constant Term (implicit): c=c
     elif x == y:
         return u
     elif isinstance(x, list) and isinstance(y, list) or \
@@ -225,7 +306,7 @@ def unify(x, y, u={}):
             u = unify(a, b, u)
             if u is FAIL: break
         return u
-        
+
     # - Variable Term: v=v, v=c|v=f, c=f|v=f
     elif isinstance(x, Var):
         return unify_var(x, y, u)
@@ -236,7 +317,9 @@ def unify(x, y, u={}):
     # FIXME: To suppress the need with cases involving Func, keep
     # every targeted Func instance evaluated before entering `unify`.
     elif isinstance(x, Func) or isinstance(y, Func):
-        raise ValueError('Unsupported unification for unevaluated Func object.')
+        raise ValueError(
+            'Unsupported unification for unevaluated Func object. '
+            '(cf. equivalence of functions - undecidability).')
 
     # - Compound Term
     # FIXME: Support Compound Term in the future maybe.
@@ -244,7 +327,8 @@ def unify(x, y, u={}):
     elif isinstance(x, TermCnpd) and isinstance(y, TermCnpd):
         if x.con != y.con:
             return FAIL
-        return unify(x.terms, y.terms, u)
+        else:
+            return unify(x.terms, y.terms, u)
 
     # unify Atomic Sentence
     # - Eq/NotEq
@@ -257,15 +341,15 @@ def unify(x, y, u={}):
         # verb, i.e. to allow variable to represent Relations
         # (predicate symbols, verbs) besides Constants
         # (subjective/objective)?
-        # 
-        # u = unify(x.verb, y.verb, u)
+        #
+        u = unify(x.verb, y.verb, u)
         if len(x.terms) != len(y.terms):
             raise ValueError('Arity mismatch: {} =?= {}'.format(x, y))
         return unify(x.terms, y.terms, u)
 
     # unify Complex Sentence
 
-    # FIXME: These sentences can only be unified after
+    # FIXME: Sentences can only be unified after
     # evaluation. Unification successes iff both sides have the same
     # truth value.
     elif isinstance(x, Sen) and isinstance(y, Sen):
@@ -277,6 +361,7 @@ def unify(x, y, u={}):
     # FAIL: type inconsistent
     else:
         return FAIL
+
 
 def occurs_in(v, x):
     "Occurence check."
@@ -291,8 +376,9 @@ def occurs_in(v, x):
     else:
         return False
 
+
 def unify_var(v, z, u):
-    "Try append a consistent binding `v: z` into unifier `u`."
+    "Try append a consistent binding `(v: z)` into unifier `u`."
     assert isinstance(v, Var)
     if u is FAIL:
         return FAIL
@@ -308,8 +394,9 @@ def unify_var(v, z, u):
     else:
         u1 = dict(u); u1[v] = z
         return u1
-        
-def find_updated(u):
+
+
+def updated_subst(u):
     "Substitute all Var's in `u` w.R.t. itself until fix point."
     def root(x):
         if x in u:
@@ -320,11 +407,12 @@ def find_updated(u):
             return x
     return {k: root(k) for k in u}
 
+
 def subst(u, x):
     """Substitute `u[x]` for `x` recursively.
 
-    - Evaluate `Func` when possible, since this comprises also some
-    kind of 'substitute'
+    - Evaluate `Func` when possible - this is also 'substitution':
+    `Func` is replaced by another value: `result of Func`.
 
     """
     # Term
@@ -344,7 +432,7 @@ def subst(u, x):
     elif isinstance(x, Pred):
         return Pred(x.verb, *(subst(u, y) for y in x.terms))
     elif isinstance(x, Sen):
-        return type(x)(*[subst(u, y) for y in x.subs])
+        return type(x)(*(subst(u, y) for y in x.subs))
     # Constant term
     else:
         # Constant
@@ -352,24 +440,29 @@ def subst(u, x):
 
 
 from itertools import count
+
 stand_count = count()
-def univ_inst(x, u=None):
-    "Instantiate ScmVar to Var."
-    if u is None: u = {}
+def univ_inst(x, env=None):
+    """Instantiate ScmVar to Var. This is like beta-reduction in the
+    context of lambda calculus.
+
+    """
+    if env is None:
+        env = {}
     if isinstance(x, ScmVar):
-        if x._mark not in u:
-            u[x._mark] = Var('{}_#{}'.format(x._mark, next(stand_count)))
-        return u[x._mark]
+        if x._mark not in env:
+            env[x._mark] = Var('{}_#{}'.format(x._mark, next(stand_count)))
+        return env[x._mark]
     elif isinstance(x, Var):
         raise
     elif isinstance(x, TermCnpd):
-        return TermCnpd(x.con, *(univ_inst(y, u) for y in x.terms))
+        return TermCnpd(x.con, *(univ_inst(y, env) for y in x.terms))
     elif isinstance(x, Func):
-        return Func(x.op, *(univ_inst(a, u) for a in x.args))
+        return Func(x.op, *(univ_inst(a, env) for a in x.args))
     elif isinstance(x, Pred):
-        return Pred(x.verb, *(univ_inst(y, u) for y in x.terms))
+        return Pred(x.verb, *(univ_inst(y, env) for y in x.terms))
     elif isinstance(x, Sen):
-        return type(x)(*(univ_inst(y, u) for y in x.subs))
+        return type(x)(*(univ_inst(y, env) for y in x.subs))
     else:
         # Constant
         return x
@@ -380,7 +473,7 @@ def stand_reset():
 
 
 # === Knowledge Base ===
-# 
+#
 # Properties of a KB
 # + tell: register a logical sentence
 # + ask : perform a query
@@ -389,11 +482,12 @@ def stand_reset():
 #   - a real-time query
 
 class KB(object):
+
     def __init__(self):
         self.facts = {}
         self.rules = {}
+
     def __repr__(self):
-        from pprint import pformat
         return pformat((self.facts, self.rules))
 
     # Augmenting KB
@@ -416,22 +510,28 @@ class KB(object):
         elif isinstance(sen, (And, Or, Not)):
             raise NotImplementedError
 
+    # Dealing facts
     def has_fact(self, key):
         return key in self.facts
+
     def add_fact(self, pred):
         if pred.key not in self.facts:
             self.facts[pred.key] = []
         self.facts[pred.key].append(pred)
+
     def get_facts(self, symbol):
         if symbol in self.facts:
             yield from self.facts[symbol]
 
+    # Dealing rules
     def has_rule(self, key):
         return key in self.rules
+
     def add_rule(self, rule):
         if rule.key not in self.rules:
             self.rules[rule.key] = []
         self.rules[rule.key].append(rule)
+
     def get_rules(self, key):
         if key in self.rules:
             yield from self.rules[key]
@@ -442,13 +542,13 @@ class KB(object):
         for u in kb.ask_1(goal, {}):
             # Update all RHS in `u` recursively thus each rooted Var
             # gets substituted by its root.
-            u1 = find_updated(u)
+            u1 = updated_subst(u)
             for k in set(u):
                 if '#' in k.symbol:
                     u1.pop(k)
             yield u1
 
-    # Dispatch ASK
+    # Dispatch ASK of 1 query.
     def ask_1(kb, goal0, u):
         goal = subst(u, goal0)
         # !query Atomic Sentence
@@ -465,8 +565,8 @@ class KB(object):
             yield from kb.ask_rule(goal, u)
         else:
             raise ValueError('Illegal goal: {}'.format(goal0))
-    
-    # ASK for Atomic Sentence
+
+    # ASK for Atomic Sentence.
     def ask_atom(kb, goal, u):
         'Dispatch Atomic Sentence asked.'
         if isinstance(goal, Eq):
@@ -492,7 +592,7 @@ class KB(object):
         yield from kb.ask_fact(goal, u)
         yield from kb.ask_rule(goal, u)
 
-    # ASK for Complex Sentence 
+    # ASK for Complex Sentence.
     def ask_or(kb, goal, u):
         for sub in goal.subs:
             yield from kb.ask_1(sub, u)
@@ -519,6 +619,7 @@ class KB(object):
             if u1 is not FAIL:
                 yield u1
 
+    # Ask for rule (complex predicate).
     def ask_rule(kb, goal, u):
         for rule in kb.get_rules(goal.key):
             rule1 = univ_inst(rule)
@@ -533,9 +634,12 @@ class KB(object):
                 yield from kb.ask_1(rule1, u)
 
 
+# === API ===
+
+
+
 # === Front-end ===
 # - Supply tricky sugar for using KB functionalities neatly.
-from functools import reduce
 
 class PredM(Pred):
     "Subtyping `Pred` to support adding instance into KB when called."
@@ -598,7 +702,7 @@ class KBMan(object):
         )
 
     Example queries:
-    
+
         >>> q = k.query
         >>> q1 = q.ancester(var.x, 'Lucy')
         >>> next(q1)
@@ -654,4 +758,3 @@ class builtins:
     NotEq = NotEq
     Func = Func
     Assert = Assert
-

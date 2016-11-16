@@ -86,7 +86,7 @@ if __name__ == '__main__':
     kb.tell(
         Pred('factorial', scm.x, scm.y)
         <=
-        Assert(Func(op.gt, scm.x, -1)) &
+        AssertFunc(op.gt, scm.x, -1) &
         Pred('factorial', Func(op.sub, scm.x, 1), scm.y1) &
         Eq(scm.y, Func(op.mul, scm.x, scm.y1))
     )
