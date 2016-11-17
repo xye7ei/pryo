@@ -89,10 +89,55 @@ class NotEq(SenAtom):
         return '({} != {})'.format(t1, t2)
 
 
-class Term(object):
+class Operable(object):
+    # 
+    def __eq__(self, other): return Eq(self, other)
+    def __ne__(self, other): return NotEq(self, other)
+    def __gt__(self, other): return Assert(Func(op.gt, self, other))
+    def __ge__(self, other): return Assert(Func(op.ge, self, other))
+    def __lt__(self, other): return Assert(Func(op.lt, self, other))
+    def __le__(self, other): return Assert(Func(op.le, self, other))
+
+    def __add__(self, other): return Func(op.add, self, other)
+    def __sub__(self, other): return Func(op.sub, self, other)
+    def __mul__(self, other): return Func(op.mul, self, other)
+    def __rmul__(self, other): return Func(op.mul, self, other)
+    def __mod__(self, other): return Func(op.mod, self, other)
+    def __pow__(self, other): return Func(op.pow, self, other)
+    def __pos__(self, other): return Func(op.pos, self, other)
+    def __neg__(self, other): return Func(op.neg, self, other)
+    # def __matmul__(self, other): return Func(op.matmul, self, other)
+    def __truediv__(self, other): return Func(op.truediv, self, other)
+    def __rtruediv__(self, other): return Func(op.truediv, other, self)
+
+    # f @ x
+    # where f is a normal Python function
+    # => Func(f, x)
+    def __rmatmul__(self, func): return Func(func, self)
+
+
+class Applier(object):
+    def __init__(self, fctx):
+        # Force ctx to be evaluated from laziness.
+        assert callable(fctx)
+        self._ctx = fctx()
+    def __getattr__(self, k):
+        ctx = object.__getattribute__(self, '_ctx')
+        if k in __builtins__:
+            return lambda *a: Func(__builtins__[k], *a)
+        elif k in ctx:
+            return lambda *a: Func(ctx[k], *a)
+        else:
+            raise KeyError('Unknown applier target {}.'.format(repr(k)))
+
+
+# class Term(object):
+class Term(Operable):
     "Abstract class."
     def __init__(self, *a, **kw):
         raise NotImplementedError('Need override constructor in derived subclasses.')
+    def __hash__(self):
+        raise NotImplementedError('Need override hash in derived subclasses.')
 
 class TermCnpd(Term):
     def __init__(self, con, *terms):
@@ -102,29 +147,28 @@ class TermCnpd(Term):
         return '{}{}'.format(self.con, self.terms)
     def __call__(self, *terms):
         self.terms = terms
+    def __hash__(self):
+        return hash(self.con)
 
 class Var(Term):
     def __init__(self, symbol):
         self.symbol = symbol
     def __repr__(self):
         return '${}'.format(self.symbol)
+    def __eq__(self, other):
+        # return type(other) == type(self) and self.symbol == other.symbol
+        raise NotImplementedError('Var is not comparable directly.')
     def __hash__(self):
         return hash(self.symbol)
-    def __eq__(self, other):
-        return type(other) == type(self) and self.symbol == other.symbol
 
 class Func(Term):
     "Func is a lazy object for function application."
     def __init__(self, op, *args):
         self.op = op
         self.args = args
-    def __iter__(self):
-        yield self.op
-        yield self.args
     def __repr__(self):
         op_name = self.op.__name__
         return '{}{}'.format(op_name, self.args or '')
-        # return '{}{}'.format(self.op, self.args or '')
     def __call__(self, *args):
         self.args = args
         return self
@@ -134,7 +178,6 @@ class Func(Term):
         return self.op(*self.args)
     def can_eval(self):
         return all(type(a) not in (Var, Func) for a in self.args)
-ap = Func
 
 def Assert(func):
     return Eq(True, func)
@@ -151,7 +194,6 @@ def Ge(l, r):
 def Le(l, r):
     return Eq(True, Func(op.le, l, r))
 
-asp = AssertFunc
 
 import operator as op
 
@@ -169,25 +211,6 @@ class ScmVar(Term):
     def __repr__(self):
         return ':{}'.format(self._mark)
 
-    # def __getattr__(self, k):
-    #     if not k.startswith('_'): return ap(getattr,)
-
-    def __eq__(self, other): return Eq(self, other)
-    def __ne__(self, other): return NotEq(self, other)
-    def __gt__(self, other): return AssertFunc(op.gt, self, other)
-    def __ge__(self, other): return AssertFunc(op.ge, self, other)
-
-    def __add__(self, other): return ap(op.add, self, other)
-    def __sub__(self, other): return ap(op.sub, self, other)
-    def __mul__(self, other): return ap(op.mul, self, other)
-    def __rmul__(self, other): return ap(op.mul, self, other)
-    def __mod__(self, other): return ap(op.mod, self, other)
-    def __pow__(self, other): return ap(op.pow, self, other)
-    def __pos__(self, other): return ap(op.pos, self, other)
-    def __neg__(self, other): return ap(op.neg, self, other)
-    def __matmul__(self, other): return ap(op.matmul, self, other)
-    def __truediv__(self, other): return ap(op.truediv, self, other)
-    def __rtruediv__(self, other): return ap(op.truediv, other, self)
 
 # === Easy Use ===
 def easy(cls):
@@ -211,20 +234,31 @@ pred = easy(Pred)
 FAIL = '-FAIL-'
 
 def unify(x, y, u={}):
+
     "Unification can apply to `Term` as well as `Pred`."
+
+    # Transitive FAIL
     if u is FAIL:
         return FAIL
 
-    # unify Term (9-cases in total)
-    # - Constant Term: c=c
-    elif x == y:
-        return u
+    # unify iterable
     elif isinstance(x, list) and isinstance(y, list) or \
          isinstance(x, tuple) and isinstance(y, tuple):
         for a, b in zip(x, y):
             u = unify(a, b, u)
             if u is FAIL: break
         return u
+
+    # unify Term
+    # x, y : Const|Var|Func|Cpnd
+    # 16 combinations as (x, y) to unify!
+
+    # - Constant value (not a Term defined in this context!): c=c
+    elif not isinstance(x, (Term, Sen)) and not isinstance(y, (Term, Sen)):
+        if x == y:
+            return u
+        else:
+            return FAIL
         
     # - Variable Term: v=v, v=c|v=f, c=f|v=f
     elif isinstance(x, Var):
@@ -296,7 +330,7 @@ def unify_var(v, z, u):
     assert isinstance(v, Var)
     if u is FAIL:
         return FAIL
-    elif isinstance(z, Var) and v == z:
+    elif isinstance(z, Var) and v.symbol == z.symbol:
         return u
     elif occurs_in(v, z):
         raise ValueError('Occurence found.')
@@ -332,7 +366,7 @@ def subst(u, x):
         if x in u: return u[x]
         else:      return x
     elif isinstance(x, TermCnpd):
-        return TermCnpd(x.con, *[subst(u, y) for y in x.terms])
+        return TermCnpd(x.con, *(subst(u, y) for y in x.terms))
     elif isinstance(x, Func):
         # Eval func here after post-order construction.
         f = Func(x.op, *(subst(u, a) for a in x.args))
@@ -344,7 +378,7 @@ def subst(u, x):
     elif isinstance(x, Pred):
         return Pred(x.verb, *(subst(u, y) for y in x.terms))
     elif isinstance(x, Sen):
-        return type(x)(*[subst(u, y) for y in x.subs])
+        return type(x)(*(subst(u, y) for y in x.subs))
     # Constant term
     else:
         # Constant
@@ -621,17 +655,17 @@ class KBMan(object):
             else:
                 kb = self._kb
                 if k in kb.facts or k in kb.rules:
+                    # def q(*args):
+                    #     args1 = []
+                    #     # Convert uppercase str to Var.
+                    #     for arg in args:
+                    #         if isinstance(arg, str) and arg.startswith('$'):
+                    #             args1.append(Var(arg))
+                    #         else:
+                    #             args1.append(arg)
+                    #     yield from self._kb.ask(Pred(k, *args1))
                     def q(*args):
-                        args1 = []
-                        # Convert uppercase str to Var.
-                        for arg in args:
-                            if isinstance(arg, str) and \
-                               (arg.isupper() or\
-                                arg.startswith('$')):
-                                args1.append(Var(arg))
-                            else:
-                                args1.append(arg)
-                        yield from self._kb.ask(Pred(k, *args1))
+                        yield from self._kb.ask(Pred(k, *args))
                     q.__doc__ = "Query with keyword {}.".format(repr(k))
                     return q
                 else:

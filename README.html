@@ -1093,8 +1093,10 @@ print(list(r))
 # [{$w: 24}]
 </code></pre>
 
-<p>Some user-defined or pre-defined structures are also no problem, for example the <code>Cons</code> structure and the <code>append</code> predicate over such structure:<br />
+<p>Some user-defined or pre-defined structures are also no problem, for example the <code>Cons</code> structure (an instance of compound term <code>TermCnpd</code>) and the <code>append</code> predicate over such structure:<br />
 <pre><code class="python"># Declare literal data type
+from pryo import TermCnpd
+
 Cons = lambda car, cdr: TermCnpd('Cons', car, cdr)
 NIL = None
 

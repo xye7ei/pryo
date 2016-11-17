@@ -98,8 +98,11 @@ from pryo import scm
 # Declare predicate
 xs, ys, zs = scm('xs ys zs'.split())
 
-k.append < (NIL, y, y)
 
+# ??????????????????
+NIL = 'NIL'
+
+k.append < (NIL, y, y)
 k.append(Cons(x, xs), y, Cons(x, zs)) <= k.append(xs, y, zs)
 
 # # Short for:

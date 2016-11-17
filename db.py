@@ -15,14 +15,22 @@ k.person<(998, 'Furios', 25, 'Titja street.', 28)
 
 # q : q.age(var.x, var.y) & Assert(Func(op.gt, var.y, 21))
 
-k.neighbor(scm.name1, scm.name2) <= (
+s = scm
+f = Func
+ap = Applier(globals)
+
+k.neighbor(s.name1, s.name2) <= (
     # binding
-    k.person(scm.id1, scm.name1, scm.age1, scm.street1, scm.num1),
-    k.person(scm.id2, scm.name2, scm.age2, scm.street2, scm.num2),
+    k.person(s.id1, s.name1, s.age1, s.street1, s.num1),
+    k.person(s.id2, s.name2, s.age2, s.street2, s.num2),
     # qualification
-    scm.id1 != scm.id2,
-    scm.street1 == scm.street2,
-    Le(ap(abs, scm.num1 - scm.num2), 5),
+    s.id1 != s.id2,
+    s.street1 == s.street2,
+    # Le(ap(abs, s.num1 - s.num2), 5),
+    # f(abs, s.num1 - s.num2) <= 5,
+    # ap.abs(s.num1 - s.num2) <= 5,
+    abs@(s.num1 - s.num2) <= 5,
+    # f.abs(s.num1 - s.num2) <= 5,
 )
 
 
@@ -30,3 +38,6 @@ r = k.query.neighbor(var.n1, var.n2)
 from pprint import pprint
 pprint(list(r))
 
+
+print(Le(Func(abs, s.num1 - s.num2), 5))
+print(Func(abs, s.num1 - s.num2) <= 5)

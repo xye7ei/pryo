@@ -88,9 +88,12 @@ print(list(r))
 # [{$w: 24}]
 ```
 
-Some user-defined or pre-defined structures are also no problem, for example the `Cons` structure and the `append` predicate over such structure:
+Some user-defined structures are also no problem, for example the `Cons` structure (an instance of compound term `TermCnpd`) and the `append` predicate over such structure:
+
 ``` python
 # Declare literal data type
+from pryo import TermCnpd
+
 Cons = lambda car, cdr: TermCnpd('Cons', car, cdr)
 NIL = None
 
@@ -111,10 +114,6 @@ print(list(r))
 ```
 
 
-In summary, several features are interesting here:
-
-+ Non-literal specification of predicates/terms.
-+ Function application object `Func`;
 
 though more tricks for simplification are yet to be explored.
 
