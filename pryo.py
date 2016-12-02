@@ -111,6 +111,9 @@ class Pred(SenAtom):
         return self.verb
 
 
+P = Pred                        # For easy-asscess.
+
+
 class Eq(SenAtom):
 
     "Eq is a special Atomic Sentence on 2 terms."
@@ -291,6 +294,10 @@ class ScmVar(Term):
     def __repr__(self):
         return ':{}'.format(self._mark)
 
+    def __hash__(self):
+        raise NotImplementedError(
+            'ScmVar is unhashable and not for queries. '
+            'Maybe you need Var.')
 
 
 # === Easy Use ===
@@ -717,7 +724,7 @@ class PredM(Pred):
     #     self.kb.tell(Rule(lhs, rhs))
 
     def __pos__(self):
-        "For tell schematic facts?"
+        "For telling schematic facts?"
         self.kb.tell(Pred(self.verb, *self.terms))
 
 
