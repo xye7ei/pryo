@@ -14,13 +14,18 @@ k.father['Gregor', 'John']
 # Schematic variables for First-Order rules
 x, y, z, w = scm('xyzw')
 
+# Declaring a rule
+# - Use brackets at LHS, roughly meaning:
+#   + "making a new index"
+# - Use parenthesis at RHS, roughly meaning:
+#   + "using the indexed"
+#   + "calling for unification"
 k.sibling[x, y] = (
     k.father(z, x) &
     k.father(z, y) &
     (x != y)
 )
 
-pprint(k._kb)
 q = k.query
 
 res = q.sibling(var.x, var.y)
