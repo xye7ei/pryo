@@ -20,11 +20,11 @@ x, y, z, w = scm('xyzw')
 # - Use parenthesis at RHS, roughly meaning:
 #   + "using the indexed"
 #   + "calling for unification"
-k.sibling[x, y] = (
-    k.father(z, x) &
-    k.father(z, y) &
+k.sibling[x, y] = [
+    k.father(z, x),
+    k.father(z, y),
     (x != y)
-)
+]
 
 q = k.query
 
@@ -43,7 +43,7 @@ k.parent[x, y] = k.mother(x, y)
 
 # Recursive rules
 k.ancester[x, y] = k.father(x, y)
-k.ancester[x, y] = k.father(x, z) & k.ancester(z, y)
+k.ancester[x, y] = [k.father(x, z), k.ancester(z, y)]
 
 
 

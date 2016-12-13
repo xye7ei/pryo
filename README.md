@@ -1,13 +1,23 @@
 pryo
 =====
 
-This is a experimental core implementation for native *Prolog* functionalities in *Python* environment. It aims to allow experimenting Prolog-style knowledge-base within Python without any dependencies.
+This is a experimental core implementation for native *Prolog*
+functionalities in *Python* environment. It aims to allow
+experimenting Prolog-style knowledge-base within Python without any
+dependencies.
 
-The implementation is based on instructions in book [AIMA](http://aima.cs.berkeley.edu/) with simplest *backward-chaining* algorithm for querying. `dict` (hash table) is used for naive indexing.
+The implementation is based on instructions in
+book [AIMA](http://aima.cs.berkeley.edu/) with simplest
+*backward-chaining* algorithm for querying. `dict` (hash table) is
+used for naive indexing.
 
 ### First View
 
-The knowledge base can be simply declared as the following. `KBMan` - the knowledge base manager is the namespace and basic object. The *facts* are simply declared by pushing n-ary tuple with `<` into a fact symbol and *rules* (*definite clauses*) declared by `<=` notations:
+The knowledge base can be simply declared as the following. `KBMan` -
+the knowledge base manager is the namespace and basic object. The
+*facts* are declared through indexing several terms, while *rules*
+(*definite clauses*) declared by `=` notations, where right-hand-side
+is a list of clauses:
 
 ``` python
 from pryo import *
@@ -30,11 +40,11 @@ x, y, z, w = scm('xyzw')
 # - Use parenthesis at RHS, roughly meaning:
 #   + "using the indexed"
 #   + "calling for unification"
-k.sibling[x, y] = (
-    k.father(z, x) &
-    k.father(z, y) &
-    (x != y)
-)
+k.sibling[x, y] = [
+    k.father(z, x),
+    k.father(z, y),
+    x != y
+]
 
 
 # Simple definition
@@ -43,7 +53,7 @@ k.parent[x, y] = k.mother(x, y)
 
 # Recursive rules
 k.ancester[x, y] = k.father(x, y)
-k.ancester[x, y] = k.father(x, z) & k.ancester(z, y)
+k.ancester[x, y] = [k.father(x, z), k.ancester(z, y)]
 
 ```
 
