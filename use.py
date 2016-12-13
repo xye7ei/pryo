@@ -1,129 +1,86 @@
-from pryo import KB, P, scm, var
-
-kb = KB()
-
-kb.tell(P('father', 'pap', 'john'))
-kb.tell(P('father', 'pap', 'lucas'))
-kb.tell(P('father', 'unc', 'jacob'))
-
-
-x, y, z = scm('xyz')
-
-r = P('sibling', x, y) <= P('father', z, x) & P('father', z, y) & (x != y)
-
-kb.tell(r)
-
+from pryo import *
 from pprint import pprint
-pprint(kb)
-pprint(type(r))
 
+k = KBMan()
 
-res = kb.ask(P('sibling', var.x, var.y))
-
-pprint(next(res))
-pprint(next(res))
-pprint(next(res))
-
-from pryo import KB, P, scm, var
-
-kb = KB()
-
-kb.tell(P('father', 'pap', 'john'))
-kb.tell(P('father', 'pap', 'lucas'))
-kb.tell(P('father', 'unc', 'jacob'))
-
-
-# x, y, z = scm('xyz')
-# r = P('sibling', x, y) <= P('father', z, x) & P('father', z, y) & (x != y)
-# kb.tell(r)
-# from pprint import pprint
-# pprint(kb)
-# pprint(type(r))
-# res = kb.ask(P('sibling', var.x, var.y))
-# pprint(next(res))
-# pprint(next(res))
-# pprint(next(res))
-
-
-# Add facts
-kb.fact('father', 'opa', 'pap')
-kb.fact('father', 'pap', 'a')
-kb.fact('father', 'pap', 'b')
-
-# Alterative way
-kb.fact('mother', 'mum', ['a', 'b'])
+# Parenthesis(__call__) means adding to KB.
+k.father['John', 'Lucy']
+k.father['John', 'Lucas']
+k.mother['Sarah', 'Lucy']
+k.mother['Sarah', 'Lucas']
+k.father['Gregor', 'John']
 
 
 # Schematic variables for First-Order rules
 x, y, z, w = scm('xyzw')
 
-# Definite clause
-kb.rule(
-    ('sibling', x, y),
-    ('father', z, x) & ('father', z, y) & (x != y)
+k.sibling[x, y] = (
+    k.father(z, x) &
+    k.father(z, y) &
+    (x != y)
 )
 
-# Alternative clauses
-kb.rule(
-    ('parent', x, y), ('father', x, y))
-kb.rule(
-    ('parent', x, y), ('mother', x, y))
+pprint(k._kb)
+q = k.query
+
+res = q.sibling(var.x, var.y)
+pprint(next(res))
+pprint(next(res))
+try:
+    pprint(next(res))
+except StopIteration:
+    pass
+
+
+# Simple definition
+k.parent[x, y] = k.father(x, y)
+k.parent[x, y] = k.mother(x, y)
 
 # Recursive rules
-kb.rule(
-    ('ancester', x, y), ('father', x, y))
-kb.rule(
-    ('ancester', x, y), ('father', x, z) & ('ancester', z, y))
+k.ancester[x, y] = k.father(x, y)
+k.ancester[x, y] = k.father(x, z) & k.ancester(z, y)
 
-
-kb.ask(P('sibling', var.x, var.y))
 
 
 # Instant variable for queries
-v = pr.var
-q = k.query
+from pryo import Var
+v = var
 
 r = q.sibling(v.m, v.n)
 print(list(r))
-# [{$m: 'a', $n: 'b'}, {$m: 'b', $n: 'a'}]
+# [{$n: 'Lucas', $m: 'Lucy'}, {$n: 'Lucy', $m: 'Lucas'}]
 
-r = q.parent(v.p, 'b')
+r = q.parent(Var("lucy's parent"), 'Lucy')
 print(list(r))
-# [{$p: 'pap'}, {$p: 'mum'}]
+# [{$lucy's parent: 'John'}, {$lucy's parent: 'Sarah'}]
 
-r = q.ancester(v.x, 'b')
-print(list(r))
-# [{$x: 'pap'}, {$x: 'opa'}]
+res = q.ancester(var.ancester, var.decedant)
+pprint(list(res))
+# [{$ancester: 'John', $decedant: 'Lucy'},
+#  {$ancester: 'John', $decedant: 'Lucas'},
+#  {$ancester: 'Gregor', $decedant: 'John'},
+#  {$ancester: 'Gregor', $decedant: 'Lucy'},
+#  {$ancester: 'Gregor', $decedant: 'Lucas'}]
 
-
-from pprint import pprint
 
 import operator as op
 from operator import ge, sub, mul
 
 # Boundary case as fact to add
-k.factorial < (0, 1)            # fatorial[0] == 1
+k.factorial[0, 1]               # fatorial(0) == 1
 
-# Recurive rule
-k.factorial(x, y) <= (
+# Recurive rule (can use list/tuple as RHS)
+k.factorial[x, y] = [
     x >= 0,                     # x >= 0
     k.factorial(x - 1, z),      # z == factorial(x - 1)
     y == x * z                  # y == x * z
-)
+]
 
 # Query results
 r = q.factorial(4, v.w)
 print(list(r))
 # [{$w: 24}]
-# assert 0
 
-# FIXME: what is indeed Relation? Term? Predicate?
-# CONFER: datomic 5-tuple
-# [<$> <entity-id> <attr-key> <attr-value> <transaction-id>]
-# SELFDESCRIPTION?
-# 
-# 
-# FIXME: How to use namedtuple?
 
 from pryo import TermCnpd
 
@@ -142,28 +99,32 @@ from pryo import scm
 
 # Declare predicate
 xs, ys, zs = scm('xs ys zs'.split())
-
-
-# ??????????????????
 NIL = 'NIL'
 
-k.append < (NIL, y, y)
-k.append(Cons(x, xs), y, Cons(x, zs)) <= k.append(xs, y, zs)
+k.append[NIL, ys, ys]
+k.append[Cons(x, xs), ys, Cons(x, zs)] = k.append(xs, ys, zs)
 
-# # Short for:
-# k.append(Cons(scm.x, scm.xs), scm.y, scm.z) <=\
-#     k.append(scm.xs, scm.y, scm.zs) &\
-#     (scm.z == Cons(scm.x, scm.zs))
+# Short for:
+# k.append(Cons(x, xs), ys, z) <= [
+#     k.append(xs, ys, zs),
+#     z == Cons(x, zs)
+# ]
 
 # pprint(k._kb)
 
-r = q.append(NIL, Cons(3, NIL), v.z)
+vs = v.vs
+
+r = q.append(NIL, Cons(3, NIL), vs)
 pprint(list(r))
-r = q.append(Cons(1, NIL), Cons(3, NIL), v.z)
+# [{$vs: Cons(3, 'NIL')}]
+
+r = q.append(Cons(1, NIL), Cons(3, NIL), vs)
 pprint(list(r))
-r = q.append(Cons(1, Cons(2, NIL)), Cons(3, Cons(4, NIL)), v.z)
+# [{$vs: Cons(1, Cons(3, 'NIL'))}]
+
+r = q.append(Cons(1, Cons(2, NIL)), Cons(3, Cons(4, NIL)), vs)
 pprint(list(r))
+# [{$vs: Cons(1, Cons(2, Cons(3, Cons(4, 'NIL'))))}]
 
 
-# Named compound term?
 

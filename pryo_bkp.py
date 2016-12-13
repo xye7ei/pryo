@@ -21,9 +21,7 @@
 # Var      : VARSYMBOL
 # ScmVar   : SCMSYMBOL
 
-import operator as op
 from pprint import pformat
-from itertools import count
 
 
 # === FOL-Structures ===
@@ -66,7 +64,7 @@ class Not(Sen):
 class Rule(Sen):
 
     def __repr__(self):
-        return '({} <= {})'.format(self.lhs, self.rhs)
+        return '{{{} <= {}}}'.format(self.lhs, self.rhs)
 
     @property
     def lhs(self): return self.subs[0]
@@ -135,69 +133,37 @@ class NotEq(SenAtom):
 
 
 class Operable(object):
+    # 
+    def __eq__(self, other): return Eq(self, other)
+    def __ne__(self, other): return NotEq(self, other)
+    def __gt__(self, other): return Assert(Func(op.gt, self, other))
+    def __ge__(self, other): return Assert(Func(op.ge, self, other))
+    def __lt__(self, other): return Assert(Func(op.lt, self, other))
+    def __le__(self, other): return Assert(Func(op.le, self, other))
 
-    def __eq__(self, other):
-        return Eq(self, other)
-
-    def __ne__(self, other):
-        return NotEq(self, other)
-
-    def __gt__(self, other):
-        return Assert(Func(op.gt, self, other))
-
-    def __ge__(self, other):
-        return Assert(Func(op.ge, self, other))
-
-    def __lt__(self, other):
-        return Assert(Func(op.lt, self, other))
-
-    def __le__(self, other):
-        return Assert(Func(op.le, self, other))
-
-    def __add__(self, other):
-        return Func(op.add, self, other)
-
-    def __sub__(self, other):
-        return Func(op.sub, self, other)
-
-    def __mul__(self, other):
-        return Func(op.mul, self, other)
-
-    def __rmul__(self, other):
-        return Func(op.mul, self, other)
-
-    def __mod__(self, other):
-        return Func(op.mod, self, other)
-
-    def __pow__(self, other):
-        return Func(op.pow, self, other)
-
-    def __pos__(self):
-        return Func(op.pos, self)
-
-    def __neg__(self):
-        return Func(op.neg, self)
-
-    def __truediv__(self, other):
-        return Func(op.truediv, self, other)
-
-    def __rtruediv__(self, other):
-        return Func(op.truediv, other, self)
+    def __add__(self, other): return Func(op.add, self, other)
+    def __sub__(self, other): return Func(op.sub, self, other)
+    def __mul__(self, other): return Func(op.mul, self, other)
+    def __rmul__(self, other): return Func(op.mul, self, other)
+    def __mod__(self, other): return Func(op.mod, self, other)
+    def __pow__(self, other): return Func(op.pow, self, other)
+    def __pos__(self, other): return Func(op.pos, self, other)
+    def __neg__(self, other): return Func(op.neg, self, other)
+    # def __matmul__(self, other): return Func(op.matmul, self, other)
+    def __truediv__(self, other): return Func(op.truediv, self, other)
+    def __rtruediv__(self, other): return Func(op.truediv, other, self)
 
     # f @ x
     # where f is a normal Python function
     # => Func(f, x)
-    def __rmatmul__(self, func):
-        return Func(func, self)
+    def __rmatmul__(self, func): return Func(func, self)
 
 
 class Applier(object):
-
     def __init__(self, fctx):
         # Force ctx to be evaluated from laziness.
         assert callable(fctx)
         self._ctx = fctx()
-
     def __getattr__(self, k):
         ctx = object.__getattribute__(self, '_ctx')
         if k in __builtins__:
@@ -215,7 +181,6 @@ class Term(Operable):
     def __init__(self, *a, **kw):
         raise NotImplementedError(
             'Need override constructor in derived subclasses.')
-
     def __hash__(self):
         raise NotImplementedError(
             'Need override constructor in subclasses.')
@@ -234,7 +199,6 @@ class TermCnpd(Term):
 
     def __call__(self, *terms):
         self.terms = terms
-
     def __hash__(self):
         return hash(self.con)
 
@@ -293,9 +257,24 @@ ap = Func
 def Assert(func):
     return Eq(True, func)
 
-
 def AssertFunc(op, *terms):
     return Eq(True, Func(op, *terms))
+
+
+def Gt(l, r):
+    return Eq(True, Func(op.gt, l, r))
+
+def Lt(l, r):
+    return Eq(True, Func(op.lt, l, r))
+
+def Ge(l, r):
+    return Eq(True, Func(op.ge, l, r))
+
+def Le(l, r):
+    return Eq(True, Func(op.le, l, r))
+
+
+import operator as op
 
 
 class ScmVar(Term):
@@ -323,16 +302,12 @@ class ScmVar(Term):
 
 # === Easy Use ===
 def easy(cls):
-
     class _E(object):
-
         def __getattr__(self, k):
             return cls(k)
-
         def __call__(self, words):
             for w in words:
                 yield cls(w)
-
     cls.new = _E()
     # return cls
     return cls.new
@@ -356,11 +331,11 @@ def unify(x, y, u={}):
         return FAIL
 
     # unify iterable
-    elif type(x) == type(y) and isinstance(x, (list, tuple)):
+    elif isinstance(x, list) and isinstance(y, list) or \
+         isinstance(x, tuple) and isinstance(y, tuple):
         for a, b in zip(x, y):
             u = unify(a, b, u)
-            if u is FAIL:
-                break
+            if u is FAIL: break
         return u
 
     # unify Term
@@ -373,7 +348,7 @@ def unify(x, y, u={}):
             return u
         else:
             return FAIL
-
+        
     # - Variable Term: v=v, v=c|v=f, c=f|v=f
     elif isinstance(x, Var):
         return unify_var(x, y, u)
@@ -459,8 +434,7 @@ def unify_var(v, z, u):
     elif z in u:
         return unify(v, u[z], u)
     else:
-        u1 = dict(u)
-        u1[v] = z
+        u1 = dict(u); u1[v] = z
         return u1
 
 
@@ -485,10 +459,8 @@ def subst(u, x):
     """
     # Term
     if isinstance(x, Var):
-        if x in u:
-            return u[x]
-        else:
-            return x
+        if x in u: return u[x]
+        else:      return x
     elif isinstance(x, TermCnpd):
         return TermCnpd(x.con, *(subst(u, y) for y in x.terms))
     elif isinstance(x, Func):
@@ -509,9 +481,9 @@ def subst(u, x):
         return x
 
 
+from itertools import count
+
 stand_count = count()
-
-
 def univ_inst(x, env=None):
     """Instantiate ScmVar to Var. This is like beta-reduction in the
     context of lambda calculus.
@@ -537,7 +509,6 @@ def univ_inst(x, env=None):
         # Constant
         return x
 
-
 def stand_reset():
     global stand_count
     stand_count = count()
@@ -555,10 +526,11 @@ def stand_reset():
 class KB(object):
 
     def __init__(self):
-        self.base = {}
+        self.facts = {}
+        self.rules = {}
 
     def __repr__(self):
-        return pformat(self.base)
+        return pformat((self.facts, self.rules))
 
     # Augmenting KB
     def tell(self, sen):
@@ -569,23 +541,42 @@ class KB(object):
         """
         if isinstance(sen, SenAtom):
             if isinstance(sen, Pred):
-                self.add(sen)
+                self.add_fact(sen)
             elif isinstance(sen, Eq):
                 raise NotImplementedError
             elif isinstance(sen, NotEq):
                 raise NotImplementedError
-            else:
-                raise NotImplementedError
+            else: raise
         elif isinstance(sen, Rule):
-            self.add(sen)
+            self.add_rule(sen)
         elif isinstance(sen, (And, Or, Not)):
             raise NotImplementedError
 
-    # ADD
-    def add(self, sen):
-        if sen.key not in self.base:
-            self.base[sen.key] = []
-        self.base[sen.key].append(sen)
+    # Dealing facts
+    def has_fact(self, key):
+        return key in self.facts
+
+    def add_fact(self, pred):
+        if pred.key not in self.facts:
+            self.facts[pred.key] = []
+        self.facts[pred.key].append(pred)
+
+    def get_facts(self, symbol):
+        if symbol in self.facts:
+            yield from self.facts[symbol]
+
+    # Dealing rules
+    def has_rule(self, key):
+        return key in self.rules
+
+    def add_rule(self, rule):
+        if rule.key not in self.rules:
+            self.rules[rule.key] = []
+        self.rules[rule.key].append(rule)
+
+    def get_rules(self, key):
+        if key in self.rules:
+            yield from self.rules[key]
 
     # ASK
     def ask(kb, goal):
@@ -640,19 +631,8 @@ class KB(object):
             yield u
 
     def ask_pred(kb, goal, u):
-        for sen in kb.base[goal.key]:
-            # Fact
-            if isinstance(sen, SenAtom):
-                fact = univ_inst(sen)
-                u1 = unify(fact, goal, u)
-                if u1 is not FAIL:
-                    yield u1
-            # Rule
-            elif isinstance(sen, Rule):
-                rule = univ_inst(sen)
-                u1 = unify(rule.lhs, goal, u)
-                if u1 is not FAIL:
-                    yield from kb.ask_and(rule.rhs, u1)
+        yield from kb.ask_fact(goal, u)
+        yield from kb.ask_rule(goal, u)
 
     # ASK for Complex Sentence.
     def ask_or(kb, goal, u):
@@ -672,6 +652,33 @@ class KB(object):
         if not any(kb.ask_1(goal, u)):
             yield u
 
+    # Ask for simple Predicate.
+    def ask_fact(kb, goal, u):
+        for fact in kb.get_facts(goal.key):
+            fact1 = univ_inst(fact)
+            u1 = unify(fact1, goal, u)
+            # u1 = unify(fact, goal, u)
+            if u1 is not FAIL:
+                yield u1
+
+    # Ask for rule (complex predicate).
+    def ask_rule(kb, goal, u):
+        for rule in kb.get_rules(goal.key):
+            rule1 = univ_inst(rule)
+            if isinstance(rule, Rule):
+                u1 = unify(rule1.lhs, goal, u)
+                if u1 is not FAIL:
+                    yield from kb.ask_and(rule1.rhs, u1)
+                # Retract standardized-apart-counter?
+                pass
+            else:
+                # Singleton rule like k.append(NIL, scm.y, scm.y)
+                yield from kb.ask_1(rule1, u)
+
+
+# === API ===
+
+
 
 # === Front-end ===
 # - Supply tricky sugar for using KB functionalities neatly.
@@ -685,8 +692,17 @@ class PredM(Pred):
         self.kb = kb
 
     def __call__(self, *terms):
-        self.terms = terms
-        return Pred(self.verb, *terms)
+        """Add this term into KB."""
+        self.kb.tell(Pred(self.verb, *terms))
+
+    def __lt__(self, terms):
+        assert isinstance(terms, tuple)
+        self.kb.tell(Pred(self.verb, *terms))
+
+    def __lshift__(self, tlist):
+        assert isinstance(tlist, list)
+        for terms in tlist:
+            self.kb.tell(Pred(self.verb, *terms))
 
     def __le__(self, rhs):
         lhs = Pred(self.verb, *self.terms)
@@ -699,37 +715,19 @@ class PredM(Pred):
         elif isinstance(rhs, Sen):
             self.kb.tell(Rule(lhs, rhs))
 
+    def __getitem__(self, terms):
+        if type(terms) != tuple:
+            terms = (terms,)
+        self.terms = terms
+        return self
+
+    # def __setitem__(self, terms, rhs):
+    #     lhs = self[terms]
+    #     self.kb.tell(Rule(lhs, rhs))
+
     def __pos__(self):
-        """Add this term into KB."""
+        "For telling schematic facts?"
         self.kb.tell(Pred(self.verb, *self.terms))
-
-    def __getitem__(self, args):
-        if type(args) is not tuple:
-            p = Pred(self.verb, args)
-        else:
-            p = Pred(self.verb, *args)
-        self.kb.tell(p)
-
-    def __setitem__(self, args, rhs):
-        if type(args) is not tuple:
-            lhs = Pred(self.verb, args)
-        else:
-            lhs = Pred(self.verb, *args)
-        if isinstance(rhs, (list, tuple)):
-            assert len(rhs) > 0
-            sub = rhs[0]
-            for sub1 in rhs[1:]:
-                # Check whether instantiation of a predicate is
-                # recognized by the KB.
-                if isinstance(sub1, Pred):
-                    assert sub1.key in self.kb.base
-                sub = And(sub, sub1)
-            self.kb.tell(Rule(lhs, sub))
-        elif isinstance(rhs, Sen):
-            self.kb.tell(Rule(lhs, rhs))
-        else:
-            raise TypeError(':rhs: should be either a :Predicate: '
-                            'or a list of :Predicate:s.')
 
 
 class KBMan(object):
@@ -738,25 +736,16 @@ class KBMan(object):
 
     Example declarations:
 
-    .. code-block:: python
-
         k = KBMan()
-
-        # Telling facts.
-        k.father['John', 'Lucy']
-        k.father['Andreas', 'John']
-
-        # Telling rules.
-        k.ancester[scm.x, scm.y] = k.father(scm.x, scm.y)
-        k.ancester[scm.x, scm.y] = [
-            k.father(scm.x, scm.z),
-            k.ancester(scm.z, scm.y)
-        ]
-
+        k.father('John', 'Lucy')
+        k.father('Andreas', 'John')
+        k.ancester[scm.x, scm.y] <= k.father[scm.x, scm.y]
+        k.ancester[scm.x, scm.y] <= (
+            k.father[scm.x, scm.z] &
+            k.ancester[scm.z, scm.y]
+        )
 
     Example queries:
-
-    .. code-block:: python
 
         >>> q = k.query
         >>> q1 = q.ancester(var.x, 'Lucy')
@@ -772,23 +761,20 @@ class KBMan(object):
     """
 
     class QueryMan(object):
-
         def __init__(self, kb):
-            self.kb = kb
-
+            self._kb = kb
         def __getattr__(self, k):
             if k in self.__dict__:
                 return object.__getattr__(self, k)
             else:
-                kb = self.kb
-                if k in kb.base:
+                kb = self._kb
+                if k in kb.facts or k in kb.rules:
                     def q(*args):
-                        yield from self.kb.ask(Pred(k, *args))
+                        yield from self._kb.ask(Pred(k, *args))
                     q.__doc__ = "Query with keyword {}.".format(repr(k))
                     return q
                 else:
-                    raise ValueError('Unrecognized predicate '
-                                     'to be queried: "{}".'.format(k))
+                    raise ValueError('Unrecognized predicate to be queried.')
 
     def __init__(self):
         kb = KB()
@@ -800,3 +786,4 @@ class KBMan(object):
             return object.__getattr__(self, k)
         else:
             return PredM(k, kb=self._kb)
+
