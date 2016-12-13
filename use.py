@@ -1,4 +1,4 @@
-from pryo import *
+from pryo import KBMan, scm
 from pprint import pprint
 
 k = KBMan()
@@ -11,33 +11,22 @@ k.mother['Sarah', 'Lucas']
 k.father['Gregor', 'John']
 
 
-# Schematic variables for First-Order rules
+# Schematic variables for first-order qualification
 x, y, z, w = scm('xyzw')
 
 # Declaring a rule
-# - Use brackets at LHS, roughly meaning:
-#   + "making a new index"
-# - Use parenthesis at RHS, roughly meaning:
-#   + "using the indexed"
+# - Use brackets for the LHS predicate, roughly meaning:
+#   + "making a new indexed predicate"
+# - Use parenthesis for each RHS predicate, roughly meaning:
+#   + "using the indexed predicate"
 #   + "calling for unification"
 k.sibling[x, y] = [
     k.father(z, x),
     k.father(z, y),
-    (x != y)
+    x != y                      # overloaded operation on schematic vars 
 ]
 
-q = k.query
-
-res = q.sibling(var.x, var.y)
-pprint(next(res))
-pprint(next(res))
-try:
-    pprint(next(res))
-except StopIteration:
-    pass
-
-
-# Simple definition
+# Definition for alternatives
 k.parent[x, y] = k.father(x, y)
 k.parent[x, y] = k.mother(x, y)
 
@@ -46,20 +35,32 @@ k.ancester[x, y] = k.father(x, y)
 k.ancester[x, y] = [k.father(x, z), k.ancester(z, y)]
 
 
+# The query proxy
+q = k.query
 
-# Instant variable for queries
+# Variable for queries
 from pryo import Var
-v = var
 
-r = q.sibling(v.m, v.n)
-print(list(r))
-# [{$n: 'Lucas', $m: 'Lucy'}, {$n: 'Lucy', $m: 'Lucas'}]
+# Do a query with q, with two variable arguments, each variable can be
+# - explicitly constructed: Var('name')
+# - a string starts with '$': '$name'
+r = q.sibling(Var('who1'), '$who2')
+print(next(r))
+# {$who2: 'Lucas', $who1: 'Lucy'}
+print(next(r))
+# {$who2: 'Lucy', $who1: 'Lucas'}
+try:
+    print(next(r))
+except StopIteration:
+    print('Query exhausted.')
 
-r = q.parent(Var("lucy's parent"), 'Lucy')
+r = q.parent("$lucy's parent", 'Lucy')
 print(list(r))
 # [{$lucy's parent: 'John'}, {$lucy's parent: 'Sarah'}]
 
-res = q.ancester(var.ancester, var.decedant)
+
+# Query a variable relevant to a constant 'Lucy'
+res = q.ancester('$ancester', '$decedant')
 pprint(list(res))
 # [{$ancester: 'John', $decedant: 'Lucy'},
 #  {$ancester: 'John', $decedant: 'Lucas'},
@@ -76,60 +77,42 @@ k.factorial[0, 1]               # fatorial(0) == 1
 
 # Recurive rule (can use list/tuple as RHS)
 k.factorial[x, y] = [
-    x >= 0,                     # x >= 0
-    k.factorial(x - 1, z),      # z == factorial(x - 1)
-    y == x * z                  # y == x * z
+    x >= 0,                     # let x >= 0, otherwise non-termination while exhausting 
+    k.factorial(x - 1, z),      # let z == factorial(x - 1)
+    y == x * z                  # let y == x * z
 ]
 
 # Query results
-r = q.factorial(4, v.w)
+r = q.factorial(4, '$w')
 print(list(r))
 # [{$w: 24}]
 
 
 from pryo import TermCnpd
 
-# Declare literal data type
+# Declare compound data type
 Cons = lambda car, cdr: TermCnpd('Cons', car, cdr)
 NIL = None
 
-# from pypro import unify
-# u = unify(Cons(1, Cons(2, NIL)), Cons(var.x, var.y))
-# print((u))
-# u = unify([1, 2, 3], [var.x, var.y, var.z])
-# print((u))
-# assert 0
-
-from pryo import scm
-
-# Declare predicate
 xs, ys, zs = scm('xs ys zs'.split())
-NIL = 'NIL'
 
 k.append[NIL, ys, ys]
 k.append[Cons(x, xs), ys, Cons(x, zs)] = k.append(xs, ys, zs)
-
-# Short for:
-# k.append(Cons(x, xs), ys, z) <= [
+# This tricky equation above is short for:
+# k.append[Cons(x, xs), ys, zs] <= [
 #     k.append(xs, ys, zs),
-#     z == Cons(x, zs)
+#     zs == Cons(x, zs)
 # ]
 
-# pprint(k._kb)
 
-vs = v.vs
-
-r = q.append(NIL, Cons(3, NIL), vs)
+r = q.append(NIL, Cons(3, NIL), '$vs')
 pprint(list(r))
 # [{$vs: Cons(3, 'NIL')}]
 
-r = q.append(Cons(1, NIL), Cons(3, NIL), vs)
+r = q.append(Cons(1, NIL), Cons(3, NIL), '$vs')
 pprint(list(r))
 # [{$vs: Cons(1, Cons(3, 'NIL'))}]
 
-r = q.append(Cons(1, Cons(2, NIL)), Cons(3, Cons(4, NIL)), vs)
+r = q.append(Cons(1, Cons(2, NIL)), Cons(3, Cons(4, NIL)), '$vs')
 pprint(list(r))
 # [{$vs: Cons(1, Cons(2, Cons(3, Cons(4, 'NIL'))))}]
-
-
-

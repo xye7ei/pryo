@@ -676,51 +676,44 @@ class KB(object):
 # === Front-end ===
 # - Supply tricky sugar for using KB functionalities neatly.
 
+
+def trans_args(arglist):
+    "Translate strings for easy specifying ScmVar and Var. "
+    for arg in arglist:
+        if isinstance(arg, str) and arg.startswith(':'):
+            yield ScmVar(arg[1:])
+        elif isinstance(arg, str) and arg.startswith('$'):
+            yield Var(arg[1:])
+        else:
+            yield arg
+
+
 class PredM(Pred):
 
-    "Subtyping `Pred` to support adding instance into KB when called."
+    """Subtyping :Pred: for simple using."""
 
     def __init__(self, verb, kb=None):
         self.verb = verb
         self.kb = kb
 
-    def __call__(self, *terms):
-        self.terms = terms
-        return Pred(self.verb, *terms)
-
-    def __le__(self, rhs):
-        lhs = Pred(self.verb, *self.terms)
-        if isinstance(rhs, (list, tuple)):
-            assert len(rhs) > 0
-            sub = rhs[0]
-            for sub1 in rhs[1:]:
-                sub = And(sub, sub1)
-            self.kb.tell(Rule(lhs, sub))
-        elif isinstance(rhs, Sen):
-            self.kb.tell(Rule(lhs, rhs))
-
-    def __pos__(self):
-        """Add this term into KB."""
-        self.kb.tell(Pred(self.verb, *self.terms))
-
     def __getitem__(self, args):
         if type(args) is not tuple:
-            p = Pred(self.verb, args)
-        else:
-            p = Pred(self.verb, *args)
+            args = (args,)
+        p = Pred(self.verb, *trans_args(args))
         self.kb.tell(p)
 
     def __setitem__(self, args, rhs):
         if type(args) is not tuple:
-            lhs = Pred(self.verb, args)
-        else:
-            lhs = Pred(self.verb, *args)
+            args = (args,)
+        lhs = Pred(self.verb, *trans_args(args))
         if isinstance(rhs, (list, tuple)):
-            assert len(rhs) > 0
+            assert len(rhs) > 0 and isinstance(rhs[0], Sen)
             sub = rhs[0]
             for sub1 in rhs[1:]:
                 # Check whether instantiation of a predicate is
                 # recognized by the KB.
+                assert isinstance(sub1, Sen), \
+                    'Each clause must be a Sentence object.'
                 if isinstance(sub1, Pred):
                     assert sub1.key in self.kb.base
                 sub = And(sub, sub1)
@@ -771,20 +764,29 @@ class KBMan(object):
 
     """
 
-    class QueryMan(object):
+    class QueryProxy(object):
 
         def __init__(self, kb):
             self.kb = kb
 
         def __getattr__(self, k):
+            """Prepares a query manager given predicate name :k:."""
             if k in self.__dict__:
                 return object.__getattr__(self, k)
             else:
                 kb = self.kb
+                # Check if predicate name exists.
                 if k in kb.base:
                     def q(*args):
-                        yield from self.kb.ask(Pred(k, *args))
-                    q.__doc__ = "Query with keyword {}.".format(repr(k))
+                        "Delegate queried argument terms to :KB.ask: method."
+                        _args = []
+                        for arg in args:
+                            if isinstance(arg, str) and arg.startswith('$'):
+                                _args.append(Var(arg[1:]))
+                            else:
+                                _args.append(arg)
+                        yield from self.kb.ask(Pred(k, *_args))
+                    q.__doc__ = "Query proxy with keyword {}.".format(repr(k))
                     return q
                 else:
                     raise ValueError('Unrecognized predicate '
@@ -792,11 +794,11 @@ class KBMan(object):
 
     def __init__(self):
         kb = KB()
-        self._kb = kb
-        self.query = KBMan.QueryMan(kb)
+        self.kb = kb
+        self.query = KBMan.QueryProxy(kb)
 
     def __getattr__(self, k):
         if k in self.__dict__:
             return object.__getattr__(self, k)
         else:
-            return PredM(k, kb=self._kb)
+            return PredM(k, kb=self.kb)
