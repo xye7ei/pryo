@@ -10,7 +10,6 @@ k.mother['Sarah', 'Lucy']
 k.mother['Sarah', 'Lucas']
 k.father['Gregor', 'John']
 
-
 # Schematic variables for first-order qualification
 x, y, z, w = scm('xyzw')
 
@@ -23,7 +22,7 @@ x, y, z, w = scm('xyzw')
 k.sibling[x, y] = [
     k.father(z, x),
     k.father(z, y),
-    x != y                      # overloaded operation on schematic vars 
+    x != y                      # overloaded operation on schematic variables
 ]
 
 # Definition for alternatives
@@ -34,6 +33,18 @@ k.parent[x, y] = k.mother(x, y)
 k.ancester[x, y] = k.father(x, y)
 k.ancester[x, y] = [k.father(x, z), k.ancester(z, y)]
 
+# Can inspect the knowledge-base status
+pprint(k.kb)
+# [father/2['John', 'Lucy'],
+#  father/2['John', 'Lucas'],
+#  father/2['Gregor', 'John'],
+#  mother/2['Sarah', 'Lucy'],
+#  mother/2['Sarah', 'Lucas'],
+#  (sibling/2[x, y] :- father/2[z, x] & father/2[z, y] & (x != y).),
+#  (parent/2[x, y] :- father/2[x, y].),
+#  (parent/2[x, y] :- mother/2[x, y].),
+#  (ancester/2[x, y] :- father/2[x, y].),
+#  (ancester/2[x, y] :- father/2[x, z] & ancester/2[z, y].)]
 
 # The query proxy
 q = k.query
@@ -77,7 +88,7 @@ k.factorial[0, 1]               # fatorial(0) == 1
 
 # Recurive rule (can use list/tuple as RHS)
 k.factorial[x, y] = [
-    x >= 0,                     # let x >= 0, otherwise non-termination while exhausting 
+    x >= 0,                     # let x >= 0, otherwise non-termination while exhausting
     k.factorial(x - 1, z),      # let z == factorial(x - 1)
     y == x * z                  # let y == x * z
 ]

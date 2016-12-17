@@ -1,0 +1,497 @@
+commit 6c4fe970d1ad080f462f15e34cc4add8ff5e35a7
+Author: shellay <shellaylee@hotmail.com>
+Date:   Tue Dec 13 23:04:09 2016 +0100
+
+    fix of doc
+
+diff --git a/README.md b/README.md
+index 026bb27..31ccf78 100644
+--- a/README.md
++++ b/README.md
+@@ -3,27 +3,36 @@ pryo
+ 
+ This is a experimental core implementation for native *Prolog*
+ functionalities in *Python* environment. It aims to allow
+-experimenting Prolog-style knowledge-base within Python without any
+-dependencies.
++experimenting Prolog-style *knowledge base* utilities within native
++Python.
+ 
+ The implementation is based on instructions in
+-book [AIMA](http://aima.cs.berkeley.edu/) with simplest
+-*backward-chaining* algorithm for querying. `dict` (hash table) is
+-used for naive indexing.
++book [AIMA](http://aima.cs.berkeley.edu/) with the most simple
++*backward-chaining* query algorithm.
+ 
+ ### First View
+ 
+ The knowledge base can be simply declared as the following. `KBMan` -
+-the knowledge base manager is the namespace and basic object. The
+-*facts* are declared through indexing several terms, while *rules*
+-(*definite clauses*) declared by `=` notations, where right-hand-side
+-is a list of clauses:
++the knowledge base manager is the namespace and basic object for
++simplicity of usage.
++
++Any predicate is declared through accessing attribute (whose name is
++exact the name of the predicate) of `KBMan` object, with several
++*Term*s as indexing arguments.
++
++More specifically, *Facts* are declared through indexing several terms
++(calling overriden `__getitem__`). *Rules* (*definite clauses*) are
++declared by `[]=` operation (calling overriden `__setitem__`), where
++*left-hand-side* is a first-order conclusion predicate and
++*right-hand-side* is a list of premise clauses.
++
+ 
+ ``` python
+-from pryo import *
++from pryo import KBMan, scm
+ 
+ k = KBMan()
+ 
++# Facts
+ k.father['John', 'Lucy']
+ k.father['John', 'Lucas']
+ k.mother['Sarah', 'Lucy']
+@@ -31,23 +40,23 @@ k.mother['Sarah', 'Lucas']
+ k.father['Gregor', 'John']
+ 
+ 
+-# Schematic variables for First-Order rules
++# Schematic variables for first-order qualification
+ x, y, z, w = scm('xyzw')
+ 
+ # Declaring a rule
+-# - Use brackets at LHS, roughly meaning:
+-#   + "making a new index"
+-# - Use parenthesis at RHS, roughly meaning:
+-#   + "using the indexed"
++# - Use brackets for the LHS predicate, roughly meaning:
++#   + "making a new indexed predicate"
++# - Use parenthesis for each RHS predicate, roughly meaning:
++#   + "using the indexed predicate"
+ #   + "calling for unification"
+ k.sibling[x, y] = [
+     k.father(z, x),
+     k.father(z, y),
+-    x != y
++    x != y                      # overloaded operation on schematic vars 
+ ]
+ 
+ 
+-# Simple definition
++# Definition for alternatives
+ k.parent[x, y] = k.father(x, y)
+ k.parent[x, y] = k.mother(x, y)
+ 
+@@ -60,19 +69,31 @@ k.ancester[x, y] = [k.father(x, z), k.ancester(z, y)]
+ Given facts and rules, queries can be fired by calling attributes from `query` attribute of `KBMan`:
+ 
+ ``` python
+-# Instant variable for queries
+-from pryo import Var
+-v = var
++# The query proxy
++q = k.query
+ 
+-r = q.sibling(v.m, v.n)
+-print(list(r))
+-# [{$n: 'Lucas', $m: 'Lucy'}, {$n: 'Lucy', $m: 'Lucas'}]
++# Variable for queries
++from pryo import Var
+ 
+-r = q.parent(Var("lucy's parent"), 'Lucy')
++# Do a query with q, with two variable arguments, each variable can be
++# - explicitly constructed: Var('name')
++# - a string starts with '$': '$name'
++r = q.sibling(Var('who1'), '$who2')
++print(next(r))
++# {$who2: 'Lucas', $who1: 'Lucy'}
++print(next(r))
++# {$who2: 'Lucy', $who1: 'Lucas'}
++try:
++    print(next(r))
++except StopIteration:
++    print('Query exhausted.')
++
++# Query a variable relevant to a constant 'Lucy'
++r = q.parent("$lucy's parent", 'Lucy')
+ print(list(r))
+ # [{$lucy's parent: 'John'}, {$lucy's parent: 'Sarah'}]
+ 
+-res = q.ancester(var.ancester, var.decedant)
++res = q.ancester('$ancester', '$decedant')
+ pprint(list(res))
+ # [{$ancester: 'John', $decedant: 'Lucy'},
+ #  {$ancester: 'John', $decedant: 'Lucas'},
+@@ -81,7 +102,9 @@ pprint(list(res))
+ #  {$ancester: 'Gregor', $decedant: 'Lucas'}]
+ ```
+ 
+-Rules simulating *pattern matching* functions are supported:
++Some commonly used operators are overriden for schematic variables,
++thus rules simulating *pattern matching* style functions are
++here supported:
+ 
+ ``` python
+ # Boundary case as fact to add
+@@ -89,7 +112,7 @@ k.factorial[0, 1]               # let fatorial(0) == 1
+ 
+ # Recurive rule (can use list/tuple as RHS)
+ k.factorial[x, y] = [
+-    x >= 0,                     # let x >= 0
++    x >= 0,                     # let x >= 0, otherwise non-termination while exhausting
+     k.factorial(x - 1, z),      # let z == factorial(x - 1)
+     y == x * z                  # let y == x * z
+ ]
+@@ -103,45 +126,29 @@ print(list(r))
+ Some user-defined structures are also no problem, for example the `Cons` structure (an instance of compound term `TermCnpd`) and the `append` predicate over such structure:
+ 
+ ``` python
+-# Declare literal data type
++# Declare compound data type
+ Cons = lambda car, cdr: TermCnpd('Cons', car, cdr)
+ NIL = None
+ 
+-# from pypro import unify
+-# u = unify(Cons(1, Cons(2, NIL)), Cons(var.x, var.y))
+-# print((u))
+-# u = unify([1, 2, 3], [var.x, var.y, var.z])
+-# print((u))
+-# assert 0
+-
+-from pryo import scm
+-
+-# Declare predicate
+ xs, ys, zs = scm('xs ys zs'.split())
+-NIL = 'NIL'
+ 
+ k.append[NIL, ys, ys]
+ k.append[Cons(x, xs), ys, Cons(x, zs)] = k.append(xs, ys, zs)
+-
+-# Short for:
+-# k.append(Cons(x, xs), ys, z) <= [
++# This tricky equation above is short for:
++# k.append[Cons(x, xs), ys, zs] <= [
+ #     k.append(xs, ys, zs),
+-#     z == Cons(x, zs)
++#     zs == Cons(x, zs)
+ # ]
+ 
+-# pprint(k._kb)
+-
+-vs = v.vs
+-
+-r = q.append(NIL, Cons(3, NIL), vs)
++r = q.append(NIL, Cons(3, NIL), '$vs')
+ pprint(list(r))
+ # [{$vs: Cons(3, 'NIL')}]
+ 
+-r = q.append(Cons(1, NIL), Cons(3, NIL), vs)
++r = q.append(Cons(1, NIL), Cons(3, NIL), '$vs')
+ pprint(list(r))
+ # [{$vs: Cons(1, Cons(3, 'NIL'))}]
+ 
+-r = q.append(Cons(1, Cons(2, NIL)), Cons(3, Cons(4, NIL)), vs)
++r = q.append(Cons(1, Cons(2, NIL)), Cons(3, Cons(4, NIL)), '$vs')
+ pprint(list(r))
+ # [{$vs: Cons(1, Cons(2, Cons(3, Cons(4, 'NIL'))))}]
+ ```
+@@ -152,6 +159,7 @@ though more tricks for simplification are yet to be explored.
+ 
+ ### TODO
+ 
+++ Allow to retract registered facts/rules
+ + Confering ideas from project [datomic](http://www.datomic.com/) - a *Datalog* system in *Clojure*
+ + Figuring out relations between data *Record* and *Relations*
+-+ Ordering of query subexpressions?
+++ Ordering of query subexpressions (very non-trivial)
+diff --git a/pryo.py b/pryo.py
+index d14bfc6..66845ba 100644
+--- a/pryo.py
++++ b/pryo.py
+@@ -676,51 +676,44 @@ class KB(object):
+ # === Front-end ===
+ # - Supply tricky sugar for using KB functionalities neatly.
+ 
++
++def trans_args(arglist):
++    "Translate strings for easy specifying ScmVar and Var. "
++    for arg in arglist:
++        if isinstance(arg, str) and arg.startswith(':'):
++            yield ScmVar(arg[1:])
++        elif isinstance(arg, str) and arg.startswith('$'):
++            yield Var(arg[1:])
++        else:
++            yield arg
++
++
+ class PredM(Pred):
+ 
+-    "Subtyping `Pred` to support adding instance into KB when called."
++    """Subtyping :Pred: for simple using."""
+ 
+     def __init__(self, verb, kb=None):
+         self.verb = verb
+         self.kb = kb
+ 
+-    def __call__(self, *terms):
+-        self.terms = terms
+-        return Pred(self.verb, *terms)
+-
+-    def __le__(self, rhs):
+-        lhs = Pred(self.verb, *self.terms)
+-        if isinstance(rhs, (list, tuple)):
+-            assert len(rhs) > 0
+-            sub = rhs[0]
+-            for sub1 in rhs[1:]:
+-                sub = And(sub, sub1)
+-            self.kb.tell(Rule(lhs, sub))
+-        elif isinstance(rhs, Sen):
+-            self.kb.tell(Rule(lhs, rhs))
+-
+-    def __pos__(self):
+-        """Add this term into KB."""
+-        self.kb.tell(Pred(self.verb, *self.terms))
+-
+     def __getitem__(self, args):
+         if type(args) is not tuple:
+-            p = Pred(self.verb, args)
+-        else:
+-            p = Pred(self.verb, *args)
++            args = (args,)
++        p = Pred(self.verb, *trans_args(args))
+         self.kb.tell(p)
+ 
+     def __setitem__(self, args, rhs):
+         if type(args) is not tuple:
+-            lhs = Pred(self.verb, args)
+-        else:
+-            lhs = Pred(self.verb, *args)
++            args = (args,)
++        lhs = Pred(self.verb, *trans_args(args))
+         if isinstance(rhs, (list, tuple)):
+-            assert len(rhs) > 0
++            assert len(rhs) > 0 and isinstance(rhs[0], Sen)
+             sub = rhs[0]
+             for sub1 in rhs[1:]:
+                 # Check whether instantiation of a predicate is
+                 # recognized by the KB.
++                assert isinstance(sub1, Sen), \
++                    'Each clause must be a Sentence object.'
+                 if isinstance(sub1, Pred):
+                     assert sub1.key in self.kb.base
+                 sub = And(sub, sub1)
+@@ -771,20 +764,29 @@ class KBMan(object):
+ 
+     """
+ 
+-    class QueryMan(object):
++    class QueryProxy(object):
+ 
+         def __init__(self, kb):
+             self.kb = kb
+ 
+         def __getattr__(self, k):
++            """Prepares a query manager given predicate name :k:."""
+             if k in self.__dict__:
+                 return object.__getattr__(self, k)
+             else:
+                 kb = self.kb
++                # Check if predicate name exists.
+                 if k in kb.base:
+                     def q(*args):
+-                        yield from self.kb.ask(Pred(k, *args))
+-                    q.__doc__ = "Query with keyword {}.".format(repr(k))
++                        "Delegate queried argument terms to :KB.ask: method."
++                        _args = []
++                        for arg in args:
++                            if isinstance(arg, str) and arg.startswith('$'):
++                                _args.append(Var(arg[1:]))
++                            else:
++                                _args.append(arg)
++                        yield from self.kb.ask(Pred(k, *_args))
++                    q.__doc__ = "Query proxy with keyword {}.".format(repr(k))
+                     return q
+                 else:
+                     raise ValueError('Unrecognized predicate '
+@@ -792,11 +794,11 @@ class KBMan(object):
+ 
+     def __init__(self):
+         kb = KB()
+-        self._kb = kb
+-        self.query = KBMan.QueryMan(kb)
++        self.kb = kb
++        self.query = KBMan.QueryProxy(kb)
+ 
+     def __getattr__(self, k):
+         if k in self.__dict__:
+             return object.__getattr__(self, k)
+         else:
+-            return PredM(k, kb=self._kb)
++            return PredM(k, kb=self.kb)
+diff --git a/use.py b/use.py
+index 943e372..18359d0 100644
+--- a/use.py
++++ b/use.py
+@@ -1,4 +1,4 @@
+-from pryo import *
++from pryo import KBMan, scm
+ from pprint import pprint
+ 
+ k = KBMan()
+@@ -11,33 +11,22 @@ k.mother['Sarah', 'Lucas']
+ k.father['Gregor', 'John']
+ 
+ 
+-# Schematic variables for First-Order rules
++# Schematic variables for first-order qualification
+ x, y, z, w = scm('xyzw')
+ 
+ # Declaring a rule
+-# - Use brackets at LHS, roughly meaning:
+-#   + "making a new index"
+-# - Use parenthesis at RHS, roughly meaning:
+-#   + "using the indexed"
++# - Use brackets for the LHS predicate, roughly meaning:
++#   + "making a new indexed predicate"
++# - Use parenthesis for each RHS predicate, roughly meaning:
++#   + "using the indexed predicate"
+ #   + "calling for unification"
+ k.sibling[x, y] = [
+     k.father(z, x),
+     k.father(z, y),
+-    (x != y)
++    x != y                      # overloaded operation on schematic vars 
+ ]
+ 
+-q = k.query
+-
+-res = q.sibling(var.x, var.y)
+-pprint(next(res))
+-pprint(next(res))
+-try:
+-    pprint(next(res))
+-except StopIteration:
+-    pass
+-
+-
+-# Simple definition
++# Definition for alternatives
+ k.parent[x, y] = k.father(x, y)
+ k.parent[x, y] = k.mother(x, y)
+ 
+@@ -46,20 +35,32 @@ k.ancester[x, y] = k.father(x, y)
+ k.ancester[x, y] = [k.father(x, z), k.ancester(z, y)]
+ 
+ 
++# The query proxy
++q = k.query
+ 
+-# Instant variable for queries
++# Variable for queries
+ from pryo import Var
+-v = var
+ 
+-r = q.sibling(v.m, v.n)
+-print(list(r))
+-# [{$n: 'Lucas', $m: 'Lucy'}, {$n: 'Lucy', $m: 'Lucas'}]
++# Do a query with q, with two variable arguments, each variable can be
++# - explicitly constructed: Var('name')
++# - a string starts with '$': '$name'
++r = q.sibling(Var('who1'), '$who2')
++print(next(r))
++# {$who2: 'Lucas', $who1: 'Lucy'}
++print(next(r))
++# {$who2: 'Lucy', $who1: 'Lucas'}
++try:
++    print(next(r))
++except StopIteration:
++    print('Query exhausted.')
+ 
+-r = q.parent(Var("lucy's parent"), 'Lucy')
++r = q.parent("$lucy's parent", 'Lucy')
+ print(list(r))
+ # [{$lucy's parent: 'John'}, {$lucy's parent: 'Sarah'}]
+ 
+-res = q.ancester(var.ancester, var.decedant)
++
++# Query a variable relevant to a constant 'Lucy'
++res = q.ancester('$ancester', '$decedant')
+ pprint(list(res))
+ # [{$ancester: 'John', $decedant: 'Lucy'},
+ #  {$ancester: 'John', $decedant: 'Lucas'},
+@@ -76,60 +77,42 @@ k.factorial[0, 1]               # fatorial(0) == 1
+ 
+ # Recurive rule (can use list/tuple as RHS)
+ k.factorial[x, y] = [
+-    x >= 0,                     # x >= 0
+-    k.factorial(x - 1, z),      # z == factorial(x - 1)
+-    y == x * z                  # y == x * z
++    x >= 0,                     # let x >= 0, otherwise non-termination while exhausting 
++    k.factorial(x - 1, z),      # let z == factorial(x - 1)
++    y == x * z                  # let y == x * z
+ ]
+ 
+ # Query results
+-r = q.factorial(4, v.w)
++r = q.factorial(4, '$w')
+ print(list(r))
+ # [{$w: 24}]
+ 
+ 
+ from pryo import TermCnpd
+ 
+-# Declare literal data type
++# Declare compound data type
+ Cons = lambda car, cdr: TermCnpd('Cons', car, cdr)
+ NIL = None
+ 
+-# from pypro import unify
+-# u = unify(Cons(1, Cons(2, NIL)), Cons(var.x, var.y))
+-# print((u))
+-# u = unify([1, 2, 3], [var.x, var.y, var.z])
+-# print((u))
+-# assert 0
+-
+-from pryo import scm
+-
+-# Declare predicate
+ xs, ys, zs = scm('xs ys zs'.split())
+-NIL = 'NIL'
+ 
+ k.append[NIL, ys, ys]
+ k.append[Cons(x, xs), ys, Cons(x, zs)] = k.append(xs, ys, zs)
+-
+-# Short for:
+-# k.append(Cons(x, xs), ys, z) <= [
++# This tricky equation above is short for:
++# k.append[Cons(x, xs), ys, zs] <= [
+ #     k.append(xs, ys, zs),
+-#     z == Cons(x, zs)
++#     zs == Cons(x, zs)
+ # ]
+ 
+-# pprint(k._kb)
+ 
+-vs = v.vs
+-
+-r = q.append(NIL, Cons(3, NIL), vs)
++r = q.append(NIL, Cons(3, NIL), '$vs')
+ pprint(list(r))
+ # [{$vs: Cons(3, 'NIL')}]
+ 
+-r = q.append(Cons(1, NIL), Cons(3, NIL), vs)
++r = q.append(Cons(1, NIL), Cons(3, NIL), '$vs')
+ pprint(list(r))
+ # [{$vs: Cons(1, Cons(3, 'NIL'))}]
+ 
+-r = q.append(Cons(1, Cons(2, NIL)), Cons(3, Cons(4, NIL)), vs)
++r = q.append(Cons(1, Cons(2, NIL)), Cons(3, Cons(4, NIL)), '$vs')
+ pprint(list(r))
+ # [{$vs: Cons(1, Cons(2, Cons(3, Cons(4, 'NIL'))))}]
+-
+-
+-

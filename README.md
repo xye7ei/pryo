@@ -21,10 +21,10 @@ exact the name of the predicate) of `KBMan` object, with several
 *Term*s as indexing arguments.
 
 More specifically, *Facts* are declared through indexing several terms
-(calling overriden `__getitem__`). *Rules* (*definite clauses*) are
-declared by `[]=` operation (calling overriden `__setitem__`), where
-*left-hand-side* is a first-order conclusion predicate and
-*right-hand-side* is a list of premise clauses.
+(i.e. by calling overriden `__getitem__`). *Rules* (*definite
+clauses*) are declared by `[]=` operation (i.e. calling overriden
+`__setitem__`), where *left-hand-side* is a first-order conclusion
+clause and *right-hand-side* is a list of premise clauses.
 
 
 ``` python
@@ -63,7 +63,27 @@ k.parent[x, y] = k.mother(x, y)
 # Recursive rules
 k.ancester[x, y] = k.father(x, y)
 k.ancester[x, y] = [k.father(x, z), k.ancester(z, y)]
+```
 
+We can inspect the knowledge-base status by accessing the attribute
+`KBMan().kb`, which shows up the registered facts and rules. Note the
+RHS list of clauses when declaring a rule has been converted into
+underlying *conjunctive form* of clauses.
+
+``` python
+pprint(k.kb)
+
+# Output:
+[father/2['John', 'Lucy'],
+ father/2['John', 'Lucas'],
+ father/2['Gregor', 'John'],
+ mother/2['Sarah', 'Lucy'],
+ mother/2['Sarah', 'Lucas'],
+ (sibling/2[x, y] :- father/2[z, x] & father/2[z, y] & (x != y).),
+ (parent/2[x, y] :- father/2[x, y].),
+ (parent/2[x, y] :- mother/2[x, y].),
+ (ancester/2[x, y] :- father/2[x, y].),
+ (ancester/2[x, y] :- father/2[x, z] & ancester/2[z, y].)]
 ```
 
 Given facts and rules, queries can be fired by calling attributes from `query` attribute of `KBMan`:

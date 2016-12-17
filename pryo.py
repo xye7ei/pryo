@@ -24,6 +24,7 @@
 import operator as op
 from pprint import pformat
 from itertools import count
+from collections import OrderedDict as odict
 
 
 # === FOL-Structures ===
@@ -66,7 +67,7 @@ class Not(Sen):
 class Rule(Sen):
 
     def __repr__(self):
-        return '({} <= {})'.format(self.lhs, self.rhs)
+        return '({} :- {}.)'.format(self.lhs, self.rhs)
 
     @property
     def lhs(self): return self.subs[0]
@@ -313,7 +314,8 @@ class ScmVar(Term):
         self._mark = mark
 
     def __repr__(self):
-        return ':{}'.format(self._mark)
+        # return ':{}'.format(self._mark)
+        return '{}'.format(self._mark)
 
     def __hash__(self):
         raise NotImplementedError(
@@ -555,10 +557,10 @@ def stand_reset():
 class KB(object):
 
     def __init__(self):
-        self.base = {}
+        self.base = odict()
 
     def __repr__(self):
-        return pformat(self.base)
+        return pformat(list(r for rs in self.base.values() for r in rs))
 
     # Augmenting KB
     def tell(self, sen):
