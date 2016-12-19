@@ -1,37 +1,44 @@
 pryo
 =====
 
-This is a experimental core implementation for native *Prolog*
+This is a experimental core implementation for *Prolog*
 functionalities in *Python* environment. It aims to allow
 experimenting Prolog-style *knowledge base* utilities within native
-Python.
+Python language environment.
 
 The implementation is based on instructions in
-book [AIMA](http://aima.cs.berkeley.edu/) with the most simple
+book [AIMA](http://aima.cs.berkeley.edu/) with the most basic
 *backward-chaining* query algorithm.
 
-### First View
+# Preparing a knowledge base
 
-The knowledge base can be simply declared as the following. `KBMan` -
-the knowledge base manager is the namespace and basic object for
-simplicity of usage.
+The knowledge base object `KB` stores a set of first-order logical
+sentences and provides query interfaces. Further, the proxy object
+`KBMan` (knowledge base manager) is a namespace and manager wrapping a
+`KB` instance for simple accessing `KB`'s contents, where `KB` is no
+more exposed to the user directly.
 
-Any predicate is declared through accessing attribute (whose name is
-exact the name of the predicate) of `KBMan` object, with several
-*Term*s as indexing arguments.
+Simply calling `KBMan()` makes a new knowledge base:
+
+``` python
+from pryo import KBMan
+
+k = KBMan()
+```
+
+Having the KB manager instance, any predicate can be declared through
+accessing attribute (whose name is the name of the predicate and maybe
+initialized by the first accessing), with several *Term*s as arguments
+in brackets.
 
 More specifically, *Facts* are declared through indexing several terms
 (i.e. by calling overriden `__getitem__`). *Rules* (*definite
 clauses*) are declared by `[]=` operation (i.e. calling overriden
 `__setitem__`), where *left-hand-side* is a first-order conclusion
-clause and *right-hand-side* is a list of premise clauses.
+clause and *right-hand-side* is a `list` of premise clauses.
 
 
 ``` python
-from pryo import KBMan, scm
-
-k = KBMan()
-
 # Facts
 k.father['John', 'Lucy']
 k.father['John', 'Lucas']
@@ -39,15 +46,15 @@ k.mother['Sarah', 'Lucy']
 k.mother['Sarah', 'Lucas']
 k.father['Gregor', 'John']
 
+# Schematic variables for first-order universal quantification
+from pryo import scm
 
-# Schematic variables for first-order qualification
 x, y, z, w = scm('xyzw')
 
 # Declaring a rule
-# - Use brackets for the LHS predicate, roughly meaning:
+# - Using brackets for the LHS predicate, roughly meaning:
 #   + "making a new indexed predicate"
-# - Use parenthesis for each RHS predicate, roughly meaning:
-#   + "using the indexed predicate"
+# - Using parenthesis for each RHS predicate, roughly meaning:
 #   + "calling for unification"
 k.sibling[x, y] = [
     k.father(z, x),
@@ -86,20 +93,24 @@ pprint(k.kb)
  (ancester/2[x, y] :- father/2[x, z] & ancester/2[z, y].)]
 ```
 
-Given facts and rules, queries can be fired by calling attributes from `query` attribute of `KBMan`:
+
+# Doing queries
+
+Having prepared facts and rules, queries can be fired by calling
+attributes from the proxy `query`:
 
 ``` python
-# The query proxy
+# The query proxy provides by `KBMan`
 q = k.query
 
-# Variable for queries
+# Optionally using Var object for queries
 from pryo import Var
 
-# Do a query with q, with two variable arguments, each variable can be
+# Do a query with q, with two variable arguments, each variable can be either
 # - explicitly constructed: Var('name')
-# - a string starts with '$': '$name'
-r = q.sibling(Var('who1'), '$who2')
-print(next(r))
+# - a string starting with '$': '$name'
+r = q.sibling(Var('who1'), '$who2') print(next(r))
+# Query results are iteratively generated
 # {$who2: 'Lucas', $who1: 'Lucy'}
 print(next(r))
 # {$who2: 'Lucy', $who1: 'Lucas'}
@@ -113,8 +124,8 @@ r = q.parent("$lucy's parent", 'Lucy')
 print(list(r))
 # [{$lucy's parent: 'John'}, {$lucy's parent: 'Sarah'}]
 
-res = q.ancester('$ancester', '$decedant')
-pprint(list(res))
+r = q.ancester('$ancester', '$decedant')
+pprint(list(r))
 # [{$ancester: 'John', $decedant: 'Lucy'},
 #  {$ancester: 'John', $decedant: 'Lucas'},
 #  {$ancester: 'Gregor', $decedant: 'John'},

@@ -1,23 +1,24 @@
-from pryo import KBMan, scm
 from pprint import pprint
+
+from pryo import scm
+from pryo import KBMan
 
 k = KBMan()
 
-# Parenthesis(__call__) means adding to KB.
+# Facts
 k.father['John', 'Lucy']
 k.father['John', 'Lucas']
 k.mother['Sarah', 'Lucy']
 k.mother['Sarah', 'Lucas']
 k.father['Gregor', 'John']
 
-# Schematic variables for first-order qualification
+# Schematic variables for first-order universal quantification
 x, y, z, w = scm('xyzw')
 
 # Declaring a rule
-# - Use brackets for the LHS predicate, roughly meaning:
+# - Using brackets for the LHS predicate, roughly meaning:
 #   + "making a new indexed predicate"
-# - Use parenthesis for each RHS predicate, roughly meaning:
-#   + "using the indexed predicate"
+# - Using parenthesis for each RHS predicate, roughly meaning:
 #   + "calling for unification"
 k.sibling[x, y] = [
     k.father(z, x),
@@ -46,16 +47,17 @@ pprint(k.kb)
 #  (ancester/2[x, y] :- father/2[x, y].),
 #  (ancester/2[x, y] :- father/2[x, z] & ancester/2[z, y].)]
 
-# The query proxy
+# The query proxy provides by `KBMan`
 q = k.query
 
-# Variable for queries
+# Optionally using Var object for queries
 from pryo import Var
 
-# Do a query with q, with two variable arguments, each variable can be
+# Do a query with q, with two variable arguments, each variable can be either
 # - explicitly constructed: Var('name')
-# - a string starts with '$': '$name'
+# - a string starting with '$': '$name'
 r = q.sibling(Var('who1'), '$who2')
+# Query results are iteratively generated
 print(next(r))
 # {$who2: 'Lucas', $who1: 'Lucy'}
 print(next(r))
