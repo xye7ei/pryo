@@ -10,7 +10,7 @@ The implementation is based on instructions in
 book [AIMA](http://aima.cs.berkeley.edu/) with the most basic
 *backward-chaining* query algorithm.
 
-# Preparing a knowledge base
+## Preparing a knowledge base
 
 The knowledge base object `KB` stores a set of first-order logical
 sentences and provides query interfaces. Further, the proxy object
@@ -57,9 +57,9 @@ x, y, z, w = scm('xyzw')
 # - Using parenthesis for each RHS predicate, roughly meaning:
 #   + "calling for unification"
 k.sibling[x, y] = [
-    k.father(z, x),
-    k.father(z, y),
-    x != y                      # overloaded operation on schematic vars 
+	k.father(z, x),
+	k.father(z, y),
+	x != y                      # overloaded operation on schematic vars
 ]
 
 
@@ -94,7 +94,7 @@ pprint(k.kb)
 ```
 
 
-# Doing queries
+## Doing queries
 
 Having prepared facts and rules, queries can be fired by calling
 attributes from the proxy `query`:
@@ -115,9 +115,9 @@ r = q.sibling(Var('who1'), '$who2') print(next(r))
 print(next(r))
 # {$who2: 'Lucy', $who1: 'Lucas'}
 try:
-    print(next(r))
+	print(next(r))
 except StopIteration:
-    print('Query exhausted.')
+	print('Query exhausted.')
 
 # Query a variable relevant to a constant 'Lucy'
 r = q.parent("$lucy's parent", 'Lucy')
@@ -133,9 +133,15 @@ pprint(list(r))
 #  {$ancester: 'Gregor', $decedant: 'Lucas'}]
 ```
 
-Some commonly used operators are overriden for schematic variables,
-thus rules simulating *pattern matching* style functions are
-here supported:
+## Deductive computation and pattern matching
+
+Functional computation based on deductive process can be performed by
+the backward-chaining method. So it is possible to write several
+common recursive functions with help of the utilities here.
+
+Specifically, some commonly used operators are overriden for schematic
+variables. Using *pattern matching* style, we can write the
+`factorial` function like
 
 ``` python
 # Boundary case as fact to add
@@ -143,9 +149,9 @@ k.factorial[0, 1]               # let fatorial(0) == 1
 
 # Recurive rule (can use list/tuple as RHS)
 k.factorial[x, y] = [
-    x >= 0,                     # let x >= 0, otherwise non-termination while exhausting
-    k.factorial(x - 1, z),      # let z == factorial(x - 1)
-    y == x * z                  # let y == x * z
+	x >= 0,                     # let x >= 0, otherwise non-termination while exhausting
+	k.factorial(x - 1, z),      # let z == factorial(x - 1)
+	y == x * z                  # let y == x * z
 ]
 
 # Query results
@@ -154,10 +160,12 @@ print(list(r))
 # [{$w: 24}]
 ```
 
-Some user-defined structures are also no problem, for example the `Cons` structure (an instance of compound term `TermCnpd`) and the `append` predicate over such structure:
+Some user-defined structures are also supported, for example the
+`Cons` structure (an instance of compound term `TermCnpd`) and the
+`append` predicate over such structure:
 
 ``` python
-# Declare compound data type
+# Define constructor for a compound data type
 Cons = lambda car, cdr: TermCnpd('Cons', car, cdr)
 NIL = None
 
