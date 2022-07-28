@@ -1,10 +1,9 @@
-"""This test file targets direct API accesses. No front-end tricks
-are contained herein.
-
+"""
+These tests directly calls internal APIs, instead of
+using the syntactic sugars.
 """
 
-import preamble
-from pryo import *
+from pryo.pryo import *
 
 # if __name__ == '__main__':
 

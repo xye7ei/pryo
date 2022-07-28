@@ -1,0 +1,8 @@
+[tool.poetry]
+name = "pryo"
+version = "0.9.0"
+description = "A mini Prolog engine in Python"
+authors = ["Xuelei Li"]
+
+[tool.poetry.dependencies]
+python = "*"
