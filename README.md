@@ -1,24 +1,25 @@
 pryo
 =====
 
-This is a experimental core implementation for *Prolog*
-functionalities in *Python* environment. It aims to allow
-experimenting Prolog-style *knowledge base* utilities within native
-Python language environment.
+This is an experimental implementation for *Prolog*
+functionalities in *pure Python*. You can create a Prolog-style
+*knowledge base* and run queries in it with pure Python.
 
-The implementation is based on instructions in
-book [AIMA](http://aima.cs.berkeley.edu/) with the most basic
+The implementation is based on instructions in the
+book [AIMA](http://aima.cs.berkeley.edu/), based on the most basic
 *backward-chaining* query algorithm.
 
-## Preparing a knowledge base
+# Usage
 
-The knowledge base object `KB` stores a set of first-order logical
-sentences and provides query interfaces. Further, the proxy object
-`KBMan` (knowledge base manager) is a namespace and manager wrapping a
-`KB` instance for simple accessing `KB`'s contents, where `KB` is no
-more exposed to the user directly.
+## Preparing knowledge base
 
-Simply calling `KBMan()` makes a new knowledge base:
+A knowledge base object (ie. `KB`) stores a set of first-order logical
+sentences and provides query interfaces. The proxy object
+`KBMan` (knowledge base manager) is a manager object
+wrapping a `KB` instance and offers simplified access patterns to the
+content of `KB` (where `KB` is not exposed to the user directly).
+
+Simply calling `KBMan()` creates a new knowledge base:
 
 ``` python
 from pryo import KBMan
@@ -26,16 +27,13 @@ from pryo import KBMan
 k = KBMan()
 ```
 
-Having the KB manager instance, any predicate can be declared through
-accessing attribute (whose name is the name of the predicate and maybe
-initialized by the first accessing), with several *Term*s as arguments
-in brackets.
+Given the KB manager instance, accessing an attribute (together with
+*Term*s as arguments in brackets) declares a predicate. This syntactic
+sugar is not super intuitive at first sight but simplifies code a lot.
 
-More specifically, *Facts* are declared through indexing several terms
-(i.e. by calling overriden `__getitem__`). *Rules* (*definite
-clauses*) are declared by `[]=` operation (i.e. calling overriden
-`__setitem__`), where *left-hand-side* is a first-order conclusion
-clause and *right-hand-side* is a `list` of premise clauses.
+More specifically,
+- *Facts* are declared via indexing an attribute with a list of terms (where `__getitem__` wraps the logic of creating a fact behind the scene).
+- *Rules* (*definite clauses*) are declared via `[]=` operation (where `__setitem__` contains the logic of creating a rule). The *left-hand-side* is a first-order conclusion clause and *right-hand-side* is a `list` of premise clauses.
 
 
 ``` python
@@ -46,71 +44,70 @@ k.mother['Sarah', 'Lucy']
 k.mother['Sarah', 'Lucas']
 k.father['Gregor', 'John']
 
-# Schematic variables for first-order universal quantification
+# Introduce schematic variables for first-order universal quantification
 from pryo import scm
-
 x, y, z, w = scm('xyzw')
 
 # Declaring a rule
 # - Using brackets for the LHS predicate, roughly meaning:
-#   + "making a new indexed predicate"
+#   + "introduce a new indexed predicate"
 # - Using parenthesis for each RHS predicate, roughly meaning:
-#   + "calling for unification"
+#   + "call for unification"
 k.sibling[x, y] = [
 	k.father(z, x),
 	k.father(z, y),
-	x != y                      # overloaded operation on schematic vars
+	x != y                      # overloaded not-equal on schematic vars
 ]
 
 
-# Definition for alternatives
+# Assignment means appending rule alternatives
 k.parent[x, y] = k.father(x, y)
 k.parent[x, y] = k.mother(x, y)
 
-# Recursive rules
+# Recursive rules are supported
 k.ancester[x, y] = k.father(x, y)
 k.ancester[x, y] = [k.father(x, z), k.ancester(z, y)]
 ```
 
 We can inspect the knowledge-base status by accessing the attribute
-`KBMan().kb`, which shows up the registered facts and rules. Note the
-RHS list of clauses when declaring a rule has been converted into
-underlying *conjunctive form* of clauses.
+`KBMan().kb`, which shows the registered facts and rules. Note the
+RHS list of clauses has been converted into *conjunctive form* of clauses
+under the hood.
 
 ``` python
 pprint(k.kb)
 
-# Output:
-[father/2['John', 'Lucy'],
- father/2['John', 'Lucas'],
- father/2['Gregor', 'John'],
- mother/2['Sarah', 'Lucy'],
- mother/2['Sarah', 'Lucas'],
- (sibling/2[x, y] :- father/2[z, x] & father/2[z, y] & (x != y).),
- (parent/2[x, y] :- father/2[x, y].),
- (parent/2[x, y] :- mother/2[x, y].),
- (ancester/2[x, y] :- father/2[x, y].),
- (ancester/2[x, y] :- father/2[x, z] & ancester/2[z, y].)]
+# Output (The number means the arity, as in Prolog):
+# [father/2['John', 'Lucy'],
+#  father/2['John', 'Lucas'],
+#  father/2['Gregor', 'John'],
+#  mother/2['Sarah', 'Lucy'],
+#  mother/2['Sarah', 'Lucas'],
+#  (sibling/2[x, y] :- father/2[z, x] & father/2[z, y] & (x != y).),
+#  (parent/2[x, y] :- father/2[x, y].),
+#  (parent/2[x, y] :- mother/2[x, y].),
+#  (ancester/2[x, y] :- father/2[x, y].),
+#  (ancester/2[x, y] :- father/2[x, z] & ancester/2[z, y].)]
 ```
 
 
-## Doing queries
+## Running Queries
 
-Having prepared facts and rules, queries can be fired by calling
-attributes from the proxy `query`:
+Having prepared facts and rules, queries can be fired via calling
+attributes from the proxy object `query`:
 
 ``` python
-# The query proxy provides by `KBMan`
+# The query proxy provided by `KBMan`
 q = k.query
 
-# Optionally using Var object for queries
+# Optionally using the Var object for queries
 from pryo import Var
 
-# Do a query with q, with two variable arguments, each variable can be either
-# - explicitly constructed: Var('name')
-# - a string starting with '$': '$name'
+# Do a query with q, with two variable arguments and either variable can be
+# - explicitly constructed, like: Var('name')
+# - shorthand: a string starting with '$', like: '$name'
+# Query results are returned in a generator
 r = q.sibling(Var('who1'), '$who2') print(next(r))
-# Query results are iteratively generated
 # {$who2: 'Lucas', $who1: 'Lucy'}
 print(next(r))
 # {$who2: 'Lucy', $who1: 'Lucas'}
@@ -119,11 +116,14 @@ try:
 except StopIteration:
 	print('Query exhausted.')
 
-# Query a variable relevant to a constant 'Lucy'
+# Variable name can be more self-descriptive.
+# Here we query Lucy's parent, given "Lucy" as a constant to match
+# the facts and rules:
 r = q.parent("$lucy's parent", 'Lucy')
 print(list(r))
 # [{$lucy's parent: 'John'}, {$lucy's parent: 'Sarah'}]
 
+# If both arguments are variables, all matching facts are returned
 r = q.ancester('$ancester', '$decedant')
 pprint(list(r))
 # [{$ancester: 'John', $decedant: 'Lucy'},
@@ -133,23 +133,24 @@ pprint(list(r))
 #  {$ancester: 'Gregor', $decedant: 'Lucas'}]
 ```
 
-## Deductive computation and pattern matching
+## Deductive Computation and Pattern Matching
 
-Functional computation based on deductive process can be performed by
-the backward-chaining method. So it is possible to write several
-common recursive functions with help of the utilities here.
+Function call evaluation based on deductive processes are supported
+also by the backward-chaining method. Hence it is possible to write
+recursive functions.
 
-Specifically, some commonly used operators are overriden for schematic
-variables. Using *pattern matching* style, we can write the
-`factorial` function like
+While some commonly used operators are overriden for schematic
+variables, we can write the `factorial` function like
 
 ``` python
 # Boundary case as fact to add
 k.factorial[0, 1]               # let fatorial(0) == 1
 
 # Recurive rule (can use list/tuple as RHS)
+# Note x >= 0 must be the first argument, otherwise the evaluation
+# won't terminate due to eager expansion, similar to left recursion
 k.factorial[x, y] = [
-	x >= 0,                     # let x >= 0, otherwise non-termination while exhausting
+	x >= 0,                     # let x >= 0
 	k.factorial(x - 1, z),      # let z == factorial(x - 1)
 	y == x * z                  # let y == x * z
 ]
@@ -162,10 +163,10 @@ print(list(r))
 
 Some user-defined structures are also supported, for example the
 `Cons` structure (an instance of compound term `TermCnpd`) and the
-`append` predicate over such structure:
+`append` predicate as an operation on such a structure:
 
 ``` python
-# Define constructor for a compound data type
+# Define the constructor for a compound data type
 Cons = lambda car, cdr: TermCnpd('Cons', car, cdr)
 NIL = None
 
@@ -173,7 +174,7 @@ xs, ys, zs = scm('xs ys zs'.split())
 
 k.append[NIL, ys, ys]
 k.append[Cons(x, xs), ys, Cons(x, zs)] = k.append(xs, ys, zs)
-# This tricky equation above is short for:
+# The equation above is a shorthand for:
 # k.append[Cons(x, xs), ys, zs] <= [
 #     k.append(xs, ys, zs),
 #     zs == Cons(x, zs)
@@ -193,12 +194,9 @@ pprint(list(r))
 ```
 
 
-though more tricks for simplification are yet to be explored.
-
-
 ### TODO
 
-+ Allow to retract registered facts/rules
-+ Confering ideas from project [datomic](http://www.datomic.com/) - a *Datalog* system in *Clojure*
-+ Figuring out relations between data *Record* and *Relations*
++ Allow retracting registered facts/rules
++ Adopt ideas from project [datomic](http://www.datomic.com/) - a *Datalog* system in *Clojure*
++ Figure out relations between data *Record* and *Relations*
 + Ordering of query subexpressions (very non-trivial)
